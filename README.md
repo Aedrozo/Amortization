@@ -130,16 +130,59 @@ that encodes the entire scenario in the URL so you can send a client their exact
 
 ---
 
-## Running it
-
-It is a static site. Any of these work:
+## Running it locally
 
 ```bash
-npm start                 # python3 -m http.server 8080
+npm start                 # python3 -m http.server 8080  -> http://localhost:8080
 # or
 npx serve .
 # or just open index.html directly in a browser
 ```
+
+## Going live
+
+### GitHub Pages (automatic)
+`.github/workflows/pages.yml` publishes the site on every push to the default
+branch. It runs the engine tests first, so a change that breaks the math never
+reaches the live site. `actions/configure-pages` runs with `enablement: true`,
+which switches Pages on the first time the workflow runs — no repository setting
+to click.
+
+The published site is `https://<owner>.github.io/<repo>/`, and it also serves
+`/standalone.html` — the single-file build, handy to link or hand to a web team.
+
+If the workflow cannot enable Pages (organisation policy can block it), turn it
+on manually once: **Settings → Pages → Build and deployment → Source: GitHub
+Actions**, then re-run the workflow.
+
+### Embedding in an existing website
+```bash
+npm run build             # -> dist/index.html, one self-contained file
+npm run build -- dist/embed.html --fragment
+```
+`dist/index.html` is a complete page: upload it anywhere, or point a domain at
+it. Everything is inlined — CSS, all three scripts, the favicon — so there is
+nothing else to upload and no path to get wrong.
+
+`--fragment` drops the `<!doctype>/<html>/<head>/<body>` wrapper and emits just
+`<title>`, `<style>` and the body content. That is the form a CMS "custom HTML"
+block wants (WordPress Custom HTML, Squarespace Code Block, Wix Embed, HubSpot
+rich text).
+
+To embed in a page you do not control the markup of, host `dist/index.html`
+somewhere and iframe it:
+```html
+<iframe src="https://your-host/calculator.html"
+        style="width:100%;height:1400px;border:0" loading="lazy"
+        title="Mortgage calculator"></iframe>
+```
+
+### Verifying a build
+```bash
+npm run test:dist         # builds, then runs all 45 browser tests against the bundle
+```
+The bundle is held to exactly the same test suite as the multi-file site, so a
+packaging mistake fails loudly rather than shipping a subtly broken page.
 
 ## Tests
 

@@ -4,10 +4,12 @@
   "private": true,
   "description": "Mortgage amortization, extra-payment and refinance calculator suite for Gem Home Team Mortgage Lending.",
   "scripts": {
+    "start": "python3 -m http.server 8080",
+    "build": "node build.mjs",
     "test": "node --test tests/finance.test.mjs",
-    "test:ui": "node --test tests/ui.test.mjs",
-    "test:all": "node --test tests/finance.test.mjs && node --test tests/ui.test.mjs",
-    "start": "python3 -m http.server 8080"
+    "test:ui": "node --test --test-timeout=900000 tests/ui.test.mjs",
+    "test:dist": "node build.mjs && BASE_URL=http://localhost:8080/dist/index.html node --test --test-timeout=900000 tests/ui.test.mjs",
+    "test:all": "npm test && npm run test:ui && npm run test:dist"
   },
   "keywords": [
     "mortgage",

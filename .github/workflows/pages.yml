@@ -1,0 +1,70 @@
+name: Deploy calculator to GitHub Pages
+
+# Publishes the calculator on every push. The engine tests run first, so a
+# change that breaks the math never reaches the live site.
+
+on:
+  push:
+    branches:
+      - main
+      - claude/mortgage-amortization-calculator-o5woht
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it midway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify the calculation engine
+        run: node --test tests/finance.test.mjs
+
+      - name: Build the single-file bundle
+        run: node build.mjs dist/standalone.html
+
+      - name: Stage the site
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp -r assets _site/
+          cp dist/standalone.html _site/
+          # Tell Pages not to run the files through Jekyll.
+          touch _site/.nojekyll
+          # Any unknown path falls back to the calculator rather than a 404 page.
+          cp index.html _site/404.html
+          ls -R _site | head -40
+
+      - name: Configure Pages
+        # enablement: true turns Pages on automatically the first time this runs,
+        # so no manual repository setting is required.
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
