@@ -141,19 +141,24 @@ npx serve .
 
 ## Going live
 
-### GitHub Pages (automatic)
+### GitHub Pages
 `.github/workflows/pages.yml` publishes the site on every push to the default
 branch. It runs the engine tests first, so a change that breaks the math never
-reaches the live site. `actions/configure-pages` runs with `enablement: true`,
-which switches Pages on the first time the workflow runs — no repository setting
-to click.
+reaches the live site.
+
+**One-time setup, required.** The workflow asks GitHub to enable Pages, but the
+Actions token is only permitted to *deploy* to Pages, not to *create* the Pages
+site — that attempt fails with `Resource not accessible by integration`. Enable
+it once by hand:
+
+> **Settings → Pages → Build and deployment → Source: GitHub Actions**
+
+then re-run the workflow. Every push after that deploys on its own. Until it is
+enabled the workflow still builds and tests, and prints those instructions in
+the log rather than failing silently.
 
 The published site is `https://<owner>.github.io/<repo>/`, and it also serves
 `/standalone.html` — the single-file build, handy to link or hand to a web team.
-
-If the workflow cannot enable Pages (organisation policy can block it), turn it
-on manually once: **Settings → Pages → Build and deployment → Source: GitHub
-Actions**, then re-run the workflow.
 
 ### Embedding in an existing website
 ```bash

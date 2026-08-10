@@ -426,19 +426,55 @@ test('required lending disclosures are present in the footer', async () => {
   assert.match(d, /subject to credit approval/i);
   assert.match(d, /Interest rate is not APR/i);
   assert.match(d, /Regulation Z/i);
-  assert.match(d, /Equal Housing Lender/i);
   assert.match(d, /Equal Credit Opportunity Act/i);
   assert.match(d, /Loan Estimate/i);
-  const eho = await text('.eho');
-  assert.match(eho, /Equal Housing Opportunity/i);
+  const eho = (await text('.eho-bar')).replace(/\s+/g, ' ');
+  assert.match(eho, /NEO Home Loans is a division of Better Mortgage Corporation NMLS #330511/);
+  assert.match(eho, /Equal Housing Lender/);
+  assert.match(eho, /nmlsconsumeraccess\.org/);
 });
 
-test('an unconfigured build warns that NMLS identifiers are missing', async () => {
+test('the Equal Housing Lender link resolves to the real registry', async () => {
+  // The supplied artwork prints the domain with a transposition; the visible
+  // label follows the artwork but the href must still work.
+  const href = await page.getAttribute('#ehoDisclosure a', 'href');
+  assert.equal(href, 'https://www.nmlsconsumeraccess.org/');
+  const label = await text('#ehoDisclosure a');
+  assert.equal(label, 'nmlsconsumeraccess.org');
+});
+
+test('the calls to action point at the real destinations', async () => {
+  assert.equal(await page.getAttribute('#ctaPrimary', 'href'),
+    'https://neohomeloans.com/start/r/130389', 'rate quote link');
+  assert.equal(await page.getAttribute('#ctaSecondary', 'href'),
+    'https://gemteam.youcanbook.me', 'loan officer booking link');
+});
+
+test('the Equal Housing Lender mark is rendered', async () => {
+  const svg = await page.$('.eho-logo use');
+  assert.ok(svg, 'the logo is present next to the statement');
+  const label = await page.getAttribute('.eho-logo', 'aria-label');
+  assert.equal(label, 'Equal Housing Lender');
+});
+
+test('the configured branch NMLS is displayed', async () => {
   const t = await text('#licensing');
-  assert.match(t, /Set your NMLS identifiers/i,
-    'a build with no NMLS IDs must say so rather than ship silently');
+  assert.match(t, /Branch NMLS #972639/, 'the branch NMLS is shown in the footer');
   const link = await page.getAttribute('#licensing a', 'href');
   assert.match(link, /nmlsconsumeraccess\.org/, 'links to NMLS Consumer Access');
+});
+
+test('outstanding licensing fields are named, not just flagged', async () => {
+  const t = await text('#licensing .license-todo');
+  assert.match(t, /Still to add before this page goes public/i);
+  // Naming each gap is the point — a generic warning is easy to ignore.
+  for (const field of ['originator name', 'originator NMLS ID', 'states licensed']) {
+    assert.ok(t.includes(field), `warning should name "${field}"`);
+  }
+  // Fields already supplied must drop out of the warning.
+  for (const done of ['company legal name', 'company NMLS ID']) {
+    assert.ok(!t.includes(done), `"${done}" is configured and should not be flagged`);
+  }
 });
 
 test('APR is disclosed once finance charges are entered', async () => {

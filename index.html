@@ -46,9 +46,16 @@
             fill="currentColor">powered by <tspan font-weight="800">Better</tspan></text>
     </symbol>
 
-    <!-- Equal Housing Opportunity -->
-    <symbol id="mark-eho" viewBox="0 0 64 64">
-      <path fill="currentColor" d="M32 8 L60 28 L54 28 L54 56 L38 56 L38 40 L26 40 L26 56 L10 56 L10 28 L4 28 Z"/>
+    <!-- Equal Housing Lender: house enclosing an equal sign, with the mark's wording -->
+    <symbol id="mark-eho" viewBox="0 0 94 68">
+      <path fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round"
+            d="M47 5 L78 28 M47 5 L16 28 M23 25 L23 45 L71 45 L71 25"/>
+      <rect x="35" y="29" width="24" height="4.4" fill="currentColor"/>
+      <rect x="35" y="37" width="24" height="4.4" fill="currentColor"/>
+      <text x="47" y="56" font-family="Inter, sans-serif" font-size="9.5" font-weight="800"
+            letter-spacing="0.2" text-anchor="middle" fill="currentColor">EQUAL HOUSING</text>
+      <text x="47" y="66" font-family="Inter, sans-serif" font-size="9.5" font-weight="800"
+            letter-spacing="0.2" text-anchor="middle" fill="currentColor">LENDER</text>
     </symbol>
   </defs>
 </svg>
@@ -957,10 +964,6 @@
       <svg viewBox="0 0 460 78" style="color:var(--brand-ink)" role="img" aria-label="Gem Home Team Mortgage Lending">
         <use href="#mark-gem"></use>
       </svg>
-      <div class="eho">
-        <svg viewBox="0 0 64 64" style="color:var(--text-3)" aria-hidden="true"><use href="#mark-eho"></use></svg>
-        Equal Housing Opportunity
-      </div>
     </div>
     <div class="disclaimer">
       <p id="licensing" class="licensing"></p>
@@ -1002,6 +1005,15 @@
         origin, sex, marital status, familial status, disability, age, or because any part of your income comes
         from a public assistance program.
       </p>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="eho-bar">
+      <p class="eho-text" id="ehoDisclosure"></p>
+      <svg class="eho-logo" viewBox="0 0 94 68" role="img" aria-label="Equal Housing Lender">
+        <use href="#mark-eho"></use>
+      </svg>
     </div>
   </div>
 </footer>

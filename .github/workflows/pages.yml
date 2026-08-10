@@ -49,11 +49,31 @@ jobs:
           ls -R _site | head -40
 
       - name: Configure Pages
-        # enablement: true turns Pages on automatically the first time this runs,
-        # so no manual repository setting is required.
+        id: pages
+        # enablement: true asks GitHub to turn Pages on. The Actions token is
+        # allowed to DEPLOY to Pages but not always to CREATE the site, so this
+        # can fail with "Resource not accessible by integration" until someone
+        # with admin rights enables Pages once. The next step explains that.
         uses: actions/configure-pages@v5
+        continue-on-error: true
         with:
           enablement: true
+
+      - name: Explain how to finish enabling Pages
+        if: steps.pages.outcome == 'failure'
+        run: |
+          echo "::error title=GitHub Pages is not enabled::One-time setup required."
+          cat <<'MSG'
+          The workflow built and tested the site successfully, but it cannot switch
+          GitHub Pages on by itself — the Actions token is permitted to deploy to
+          Pages, not to create the Pages site.
+
+          To finish, once:
+            Settings -> Pages -> Build and deployment -> Source: GitHub Actions
+
+          Then re-run this workflow. Every push after that deploys automatically.
+          MSG
+          exit 1
 
       - uses: actions/upload-pages-artifact@v3
         with:

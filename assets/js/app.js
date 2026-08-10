@@ -23,13 +23,16 @@
    * requirement go away.
    */
   var CONFIG = {
-    quoteUrl: '#',                 // e.g. 'https://apply.neohomeloans.com/...'
-    contactUrl: '#',               // e.g. 'tel:+15551234567' or a booking link
+    quoteUrl: 'https://neohomeloans.com/start/r/130389',   // "Get my rate quote"
+    contactUrl: 'https://gemteam.youcanbook.me',           // "Talk to a loan officer"
 
     loanOfficer: '',               // e.g. 'Jane Doe, Loan Officer'
-    loanOfficerNmls: '',           // e.g. '123456'
-    company: '',                   // legal entity name on the license
-    companyNmls: '',               // e.g. '1015894'
+    loanOfficerNmls: '',           // the individual originator's NMLS ID
+    company: 'NEO Home Loans, a division of Better Mortgage Corporation',
+    companyNmls: '330511',         // Better Mortgage Corporation
+    branchNmls: '972639',          // Gem Home Team branch NMLS
+    // The approved Equal Housing Lender line, rendered verbatim beside the logo.
+    ehoStatement: 'NEO Home Loans is a division of Better Mortgage Corporation',
     dba: '',                       // e.g. 'Gem Home Team is a DBA of ...'
     address: '',                   // licensed branch address
     phone: '',
@@ -38,6 +41,19 @@
     consumerAccessUrl: 'https://www.nmlsconsumeraccess.org/',
     extraDisclosures: ''           // any additional state-required language
   };
+
+  /*
+   * Fields that must be filled in before this page is used publicly. Anything
+   * still blank is named explicitly in the on-page warning, so nobody has to
+   * guess what is outstanding.
+   */
+  var REQUIRED_LICENSING = [
+    ['loanOfficer', 'originator name'],
+    ['loanOfficerNmls', 'originator NMLS ID'],
+    ['company', 'company legal name'],
+    ['companyNmls', 'company NMLS ID'],
+    ['statesLicensed', 'states licensed']
+  ];
 
   /* ==================================================================
    * Formatting
@@ -1990,6 +2006,30 @@
     $('ctaPrimary').href = CONFIG.quoteUrl;
     $('ctaSecondary').href = CONFIG.contactUrl;
     renderLicensing();
+    renderEqualHousing();
+  }
+
+  /**
+   * The Equal Housing Lender line, shown beside the mark.
+   *
+   * Note the link target: the approved artwork prints the domain with a
+   * transposition ("nmlsconserumeraccess.org"). The label is left as supplied,
+   * but the href points at the real registry so the link resolves.
+   */
+  function renderEqualHousing() {
+    var box = $('ehoDisclosure');
+    if (!box) return;
+    var parts = [];
+    if (CONFIG.ehoStatement) {
+      parts.push(esc(CONFIG.ehoStatement) +
+        (CONFIG.companyNmls ? ' NMLS #' + esc(CONFIG.companyNmls) : ''));
+    }
+    parts.push('Equal Housing Lender');
+    if (CONFIG.consumerAccessUrl) {
+      parts.push('<a href="' + esc(CONFIG.consumerAccessUrl) +
+        '" target="_blank" rel="noopener noreferrer">nmlsconsumeraccess.org</a>');
+    }
+    box.innerHTML = parts.join('<span class="eho-sep">|</span>');
   }
 
   /**
@@ -2010,6 +2050,7 @@
     var firm = [];
     if (CONFIG.company) firm.push(esc(CONFIG.company));
     if (CONFIG.companyNmls) firm.push('Company NMLS #' + esc(CONFIG.companyNmls));
+    if (CONFIG.branchNmls) firm.push('Branch NMLS #' + esc(CONFIG.branchNmls));
     if (firm.length) lines.push(firm.join(' · '));
 
     if (CONFIG.dba) lines.push(esc(CONFIG.dba));
@@ -2024,10 +2065,14 @@
         '" target="_blank" rel="noopener noreferrer">NMLS Consumer Access</a>.');
     }
 
-    if (!CONFIG.loanOfficerNmls && !CONFIG.companyNmls) {
-      lines.unshift('<span class="license-todo">Set your NMLS identifiers and licensing ' +
-        'detail in <code>CONFIG</code> at the top of <code>assets/js/app.js</code> ' +
-        'before publishing this page.</span>');
+    var missing = REQUIRED_LICENSING
+      .filter(function (f) { return !CONFIG[f[0]]; })
+      .map(function (f) { return f[1]; });
+
+    if (missing.length) {
+      lines.unshift('<span class="license-todo">Still to add before this page goes public: ' +
+        esc(missing.join(', ')) + '. Set them in <code>CONFIG</code> at the top of ' +
+        '<code>assets/js/app.js</code>.</span>');
     }
 
     box.innerHTML = lines.join('<br>');

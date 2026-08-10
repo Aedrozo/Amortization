@@ -843,11 +843,26 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
   background: var(--amber-100); padding: 1px 5px; border-radius: 4px;
 }
 
-.eho {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-size: 11.5px; font-weight: 650; color: var(--text-3); margin-top: 10px;
+.eho-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; flex-wrap: wrap;
+  margin-top: 22px; padding-top: 18px;
+  border-top: 1px solid var(--border);
 }
-.eho svg { width: 22px; height: 22px; }
+.eho-text {
+  font-size: 12.5px; font-weight: 650; color: var(--text-2);
+  line-height: 1.6; display: flex; align-items: center; flex-wrap: wrap; gap: 2px;
+}
+.eho-text a { color: var(--cyan-600); text-decoration: none; }
+.eho-text a:hover { text-decoration: underline; }
+.eho-sep { color: var(--border-2); margin: 0 9px; }
+.eho-logo {
+  width: 62px; height: 45px; flex: 0 0 auto; color: var(--text-2);
+}
+@media (max-width: 560px) {
+  .eho-bar { flex-direction: row; align-items: flex-start; }
+  .eho-sep { margin: 0 6px; }
+}
 
 /* ==================================================================
    17. Utilities
