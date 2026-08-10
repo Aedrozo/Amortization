@@ -573,3 +573,143 @@ test('interest saved at the horizon matches the series', () => {
   const r = F.analyzeRefinance(REFI);
   approx(r.interestSavedAtHorizon, r.series[7 * 12 - 1].interestSaved, 0.02);
 });
+
+/* ------------------------------------------------------------------ */
+/* Debt consolidation                                                  */
+/* ------------------------------------------------------------------ */
+
+const DEBTS = [
+  { creditor: 'Visa', balance: 14000, payment: 420, rate: 24.99 },
+  { creditor: 'Auto loan', balance: 22000, payment: 540, rate: 8.5 },
+  { creditor: 'Student loan', balance: 31000, payment: 330, rate: 6.8 }
+];
+const CONSOL = {
+  currentBalance: 320000, currentRate: 7.25, currentRemainingMonths: 324,
+  newRate: 6.25, newTermMonths: 360, closingCosts: 6000, debts: DEBTS
+};
+
+test('debt summary totals balances, payments and blended rate', () => {
+  const d = F.summarizeDebts(DEBTS);
+  assert.equal(d.count, 3);
+  assert.equal(d.totalBalance, 67000);
+  assert.equal(d.totalMonthly, 1290);
+  // Balance-weighted: (14000*24.99 + 22000*8.5 + 31000*6.8) / 67000
+  approx(d.blendedRate, (14000 * 24.99 + 22000 * 8.5 + 31000 * 6.8) / 67000, 0.01);
+  assert.ok(d.blendedRate > 11 && d.blendedRate < 12, `blended ${d.blendedRate}`);
+});
+
+test('debt summary computes payoff time and interest per creditor', () => {
+  const d = F.summarizeDebts(DEBTS);
+  const visa = d.rows.find(r => r.creditor === 'Visa');
+  assert.equal(visa.months, F.monthsToPayoff(14000, 24.99, 420));
+  approx(visa.totalInterest, 420 * visa.months - 14000, 0.01);
+  assert.ok(visa.totalInterest > 0);
+  for (const r of d.rows) assert.ok(r.months > 0 && isFinite(r.months));
+});
+
+test('a payment that cannot cover the interest is flagged, not faked', () => {
+  const d = F.summarizeDebts([{ creditor: 'Maxed card', balance: 20000, payment: 200, rate: 26 }]);
+  // $20,000 at 26% accrues about $433 a month — a $200 payment never wins.
+  assert.equal(d.rows[0].neverPaysOff, true);
+  assert.equal(d.rows[0].months, Infinity);
+  assert.equal(d.anyNeverPaysOff, true);
+  assert.equal(d.totalInterest, Infinity, 'unbounded interest is not silently summed');
+});
+
+test('zero-rate debts amortize straight-line', () => {
+  const d = F.summarizeDebts([{ creditor: '0% promo', balance: 6000, payment: 500, rate: 0 }]);
+  assert.equal(d.rows[0].months, 12);
+  approx(d.rows[0].totalInterest, 0, 0.01);
+});
+
+test('summarizeDebts ignores empty rows', () => {
+  const d = F.summarizeDebts([null, { balance: 0, payment: 0 }, { creditor: 'Real', balance: 5000, payment: 200, rate: 10 }]);
+  assert.equal(d.count, 1);
+  assert.equal(d.totalBalance, 5000);
+});
+
+test('consolidating adds the debt balances to the new loan', () => {
+  const r = F.analyzeConsolidation(CONSOL);
+  assert.equal(r.newPrincipalRefiOnly, 320000);
+  assert.equal(r.newPrincipalConsolidated, 320000 + 67000);
+});
+
+test('monthly savings is what the borrower stops paying out', () => {
+  const r = F.analyzeConsolidation(CONSOL);
+  const mortgageToday = r.withoutConsolidation.currentPayment;
+  approx(r.monthlyToday, mortgageToday + 1290, 0.01, 'today = mortgage + debt service');
+  approx(r.monthlyConsolidated, r.withConsolidation.newPayment, 0.01,
+    'after consolidating there is only the mortgage');
+  approx(r.monthlySavingsConsolidated, r.monthlyToday - r.monthlyConsolidated, 0.01);
+  assert.ok(r.monthlySavingsConsolidated > 1000,
+    `should be a large monthly saving, got ${r.monthlySavingsConsolidated}`);
+});
+
+test('the include-vs-exclude difference is isolated', () => {
+  const r = F.analyzeConsolidation(CONSOL);
+  // Refinancing alone saves something; consolidating on top saves more.
+  assert.ok(r.monthlySavingsRefiOnly > 0, 'the refinance alone helps');
+  assert.ok(r.monthlySavingsConsolidated > r.monthlySavingsRefiOnly,
+    'including the debts saves more each month');
+  approx(r.monthlySavingsFromConsolidating,
+    r.monthlySavingsConsolidated - r.monthlySavingsRefiOnly, 0.01,
+    'the incremental benefit of consolidating is isolated correctly');
+  approx(r.monthlySavingsFromConsolidating, r.monthlyRefiOnly - r.monthlyConsolidated, 0.01);
+});
+
+test('the lifetime interest cost of consolidating is surfaced', () => {
+  const r = F.analyzeConsolidation(CONSOL);
+  // Stretching short consumer debt over 30 years costs more interest even at a
+  // much lower rate. The tool must not hide that behind the monthly saving.
+  assert.ok(r.interestOnConsolidatedDebt > 0);
+  assert.ok(r.interestIfDebtsKept > 0);
+  assert.ok(r.lifetimeInterestDelta > 0,
+    'consolidating 5-year debt into a 30-year loan costs more interest overall');
+  approx(r.lifetimeInterestDelta,
+    r.interestOnConsolidatedDebt - r.interestIfDebtsKept, 0.02);
+});
+
+test('interest added equals the difference between the two mortgages', () => {
+  const r = F.analyzeConsolidation(CONSOL);
+  approx(r.interestOnConsolidatedDebt,
+    r.withConsolidation.newTotalInterest - r.withoutConsolidation.newTotalInterest, 0.02);
+});
+
+test('a short term can make consolidating cheaper on interest too', () => {
+  // Expensive revolving debt rolled into a 15-year loan at 6.25%.
+  const r = F.analyzeConsolidation({
+    ...CONSOL, newTermMonths: 180,
+    debts: [{ creditor: 'Cards', balance: 40000, payment: 900, rate: 27 }]
+  });
+  assert.ok(r.monthlySavingsConsolidated > 0, 'still saves monthly');
+  assert.ok(r.lifetimeInterestDelta < 0,
+    'and at 27% versus 6.25% over 15 years it saves interest as well');
+});
+
+test('blended rate exposes the true cost of carrying the debt', () => {
+  const r = F.analyzeConsolidation(CONSOL);
+  assert.ok(r.blendedRateBefore > r.withoutConsolidation.currentSchedule.annualRate,
+    'high-rate consumer debt drags the blended rate above the mortgage rate');
+  assert.ok(r.blendedRateBefore > r.newRate,
+    'and above the new mortgage rate, which is the point of consolidating');
+});
+
+test('no debts means consolidation changes nothing', () => {
+  const r = F.analyzeConsolidation({ ...CONSOL, debts: [] });
+  assert.equal(r.debts.totalBalance, 0);
+  assert.equal(r.newPrincipalConsolidated, r.newPrincipalRefiOnly);
+  approx(r.monthlySavingsFromConsolidating, 0, 0.01);
+  approx(r.monthlySavingsConsolidated, r.monthlySavingsRefiOnly, 0.01);
+});
+
+test('consolidation respects rolling closing costs into the loan', () => {
+  const r = F.analyzeConsolidation({ ...CONSOL, rollIntoLoan: true });
+  assert.equal(r.newPrincipalConsolidated, 320000 + 67000 + 6000);
+  assert.equal(r.withConsolidation.cashAtClosing, 0);
+});
+
+test('consolidation combines with cash-out without double counting', () => {
+  const r = F.analyzeConsolidation({ ...CONSOL, cashOut: 25000 });
+  assert.equal(r.newPrincipalConsolidated, 320000 + 67000 + 25000);
+  assert.equal(r.newPrincipalRefiOnly, 320000 + 25000);
+});

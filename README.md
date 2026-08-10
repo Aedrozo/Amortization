@@ -64,6 +64,7 @@ Whether it is actually worth it.
 - Estimated **APR** on the new loan under Regulation Z
 - A plain-English verdict judged against how long you plan to stay
 - Lifetime interest comparison, and the opportunity cost of investing the savings instead
+- **Debt consolidation** — see below
 - **"Keep your old payment"** — refinance to the lower rate but keep writing the same
   check, and see how much earlier the loan dies
 - Discount-point buydown break-even
@@ -86,6 +87,38 @@ covers what the refinance cost. The difference is not academic:
 That case is pinned down by a test (`a term extension at a barely-better rate never repays
 its cost in interest`), as is the guarantee that the interest-based figure is never more
 optimistic than the payment-based one.
+
+#### Debt consolidation
+
+Add each debt — creditor, balance, monthly payment and rate — and a single switch decides
+whether those balances are paid off at closing and folded into the new loan.
+
+The result is a three-way read on the same month:
+
+| | Today | Refinance only | Refinance + consolidate |
+|---|---|---|---|
+| Monthly outlay | $3,543 | $3,260 | $2,383 |
+| | baseline | −$283/mo | **−$1,161/mo** |
+
+Alongside it: the saving attributable to consolidating *alone* (separated from what the
+refinance was going to save anyway), the total balance rolled in, and the **blended rate** —
+the balance-weighted average across the mortgage and every debt, which is the number that
+shows why a 6% mortgage sitting next to 25% cards is not a 6% problem.
+
+Each debt is also listed with how long it takes to clear at its current payment and how
+much interest that costs. A payment too small to cover its own interest is flagged as
+`never at this payment` rather than being turned into a fake payoff date.
+
+**The tool argues with itself here, deliberately.** Rolling five-year debt into a thirty-year
+mortgage almost always lowers the payment and raises the lifetime interest. Both numbers are
+shown with equal weight — in the example above, $1,161/month saved and about $53,000 more
+interest — so the conversation with the borrower is an informed one. Where the debt is
+expensive enough or the new term short enough that consolidating wins on interest too, the
+callout says so instead.
+
+The include/exclude switch drives the whole tab, not just this card: the new loan amount,
+payment, APR and break-even all move with it. The three-column comparison always shows both
+paths regardless, so the choice stays visible.
 
 ### 5. Compare Loans
 Three scenarios side by side — 15 vs. 30 year, two lenders, or the same loan with and
@@ -111,19 +144,21 @@ npx serve .
 ## Tests
 
 ```bash
-npm test          # 56 engine tests (pure math, no browser)
-npm run test:ui   # 36 browser tests (needs Playwright + a server on :8080)
+npm test          # 71 engine tests (pure math, no browser)
+npm run test:ui   # 45 browser tests (needs Playwright + a server on :8080)
 npm run test:all
 ```
 
 The engine suite covers the closed-form payment/balance formulas, schedule integrity
 (every row reconciles, principal repaid equals principal borrowed, the balance lands on
 exactly zero), every extra-payment mode, PMI cancellation, escrow, APR under Reg Z, both
-refinance break-even measures including the term-reset trap, and a 250-case fuzz sweep
+refinance break-even measures including the term-reset trap, debt consolidation, and a
+250-case fuzz sweep
 across loan sizes, rates and terms. The browser suite drives the real page: it asserts the
 rendered figures match the engine to the cent, that charts draw with resolved colours, that
-a below-minimum payment is rejected, that a bad refinance is called out, that the required
-disclosures are present, and that no viewport from 320px to 1280px scrolls horizontally.
+a below-minimum payment is rejected, that a bad refinance is called out, that toggling debt
+consolidation moves the balances in and out of the loan, that the required disclosures are
+present, and that no viewport from 320px to 1280px scrolls horizontally.
 
 `tests/ui.test.mjs` launches Chromium from `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`.
 Override with `CHROMIUM_PATH=/path/to/chrome` if your Playwright install manages its own.
@@ -224,6 +259,10 @@ A few decisions worth knowing about:
   property value, per the Homeowners Protection Act.
 - **Break-even on interest** compares cumulative interest accrued on each loan. Principal
   is deliberately excluded — it is equity, not cost.
+- **Consolidation** sizes the new loan as `balance + cash-out + debt payoff`, with closing
+  costs solved through the points circularity when they are rolled in. Each debt's payoff
+  horizon comes from the same `monthsToPayoff` used elsewhere, so a payment that cannot
+  cover its interest returns "never" instead of a fabricated date.
 - **Total-cost crossover** compares `payments made + balance still owed` for each path, so
   extending the term is charged for rather than treated as free savings.
 - **APR** follows Regulation Z (12 CFR 1026.22): the rate that discounts the payment

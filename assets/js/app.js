@@ -147,6 +147,7 @@
     taxMode: 'amount',
     curMode: 'balance',
     oneTime: [],
+    debts: [],
     sideTouched: false,
     activeTab: 'payment'
   };
@@ -868,6 +869,194 @@
     };
   }
 
+  /* ---------- Debt consolidation ---------- */
+
+  function debtsConfig() {
+    return state.debts.map(function (d) {
+      return {
+        creditor: d.creditor,
+        balance: parseNum(d.balance),
+        payment: parseNum(d.payment),
+        rate: parseNum(d.rate)
+      };
+    });
+  }
+
+  function consolidating() {
+    return $('consolidateDebts').getAttribute('aria-checked') === 'true';
+  }
+
+  function renderDebtList() {
+    var list = $('debtList');
+    if (!state.debts.length) {
+      list.innerHTML = '<p class="hint" style="margin-bottom:12px">No debts added yet. Add credit cards, ' +
+        'auto or student loans to see what folding them into the refinance does to the monthly payment.</p>';
+      return;
+    }
+    list.innerHTML = state.debts.map(function (d, i) {
+      return '<div class="debt-item">' +
+        '<div class="debt-item-head">' +
+        '<input type="text" data-debt="creditor" data-i="' + i + '" value="' + esc(d.creditor) + '" placeholder="Creditor" aria-label="Creditor name">' +
+        '<button class="remove-btn" type="button" data-debt="remove" data-i="' + i + '" aria-label="Remove this debt">' +
+        '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button></div>' +
+        '<div class="debt-item-fields">' +
+        '<label><span>Balance</span><div class="input-wrap"><span class="affix affix-left">$</span>' +
+        '<input type="text" inputmode="decimal" class="has-affix-left" data-debt="balance" data-i="' + i + '" value="' + esc(d.balance) + '"></div></label>' +
+        '<label><span>Payment</span><div class="input-wrap"><span class="affix affix-left">$</span>' +
+        '<input type="text" inputmode="decimal" class="has-affix-left" data-debt="payment" data-i="' + i + '" value="' + esc(d.payment) + '"></div></label>' +
+        '<label><span>Rate</span><div class="input-wrap">' +
+        '<input type="text" inputmode="decimal" class="has-affix-right" data-debt="rate" data-i="' + i + '" value="' + esc(d.rate) + '"><span class="affix affix-right">%</span></div></label>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function renderConsolidation(cur) {
+    var box = $('consolidationResult');
+    var debts = debtsConfig();
+    var summary = F.summarizeDebts(debts);
+
+    $('consolidateHint').textContent = summary.count
+      ? (consolidating()
+        ? fmt$(summary.totalBalance) + ' is added to the new loan and the ' + summary.count +
+          ' separate payment' + (summary.count === 1 ? '' : 's') + ' stop.'
+        : 'The refinance covers the mortgage only; you keep paying these separately.')
+      : '';
+
+    if (!summary.count) {
+      box.innerHTML = '<p class="empty-state mb-0">Add a debt on the left to see how much your total ' +
+        'monthly outlay changes when those balances are rolled into the loan.</p>';
+      return;
+    }
+
+    var c = F.analyzeConsolidation({
+      currentBalance: cur.balance,
+      currentRate: cur.rate,
+      currentRemainingMonths: cur.remainingMonths,
+      currentPaymentOverride: cur.paymentOverride,
+      newRate: val('newRate'),
+      newTermMonths: parseInt($('newTerm').value, 10),
+      closingCosts: val('closingCosts'),
+      pointsPct: val('points'),
+      rollIntoLoan: $('rollIn').getAttribute('aria-checked') === 'true',
+      cashOut: val('cashOut'),
+      start: F.todayYM(),
+      debts: debts
+    });
+    cache.consolidation = c;
+
+    // --- Three ways to look at the same month ---------------------------
+    var columns = [
+      {
+        title: 'Today', value: c.monthlyToday,
+        sub: 'Mortgage ' + fmt$(c.withoutConsolidation.currentPayment) + ' + ' +
+          fmt$(summary.totalMonthly) + ' in debt payments'
+      },
+      {
+        title: 'Refinance only', value: c.monthlyRefiOnly,
+        sub: c.monthlySavingsRefiOnly >= 0
+          ? 'Saves ' + fmt$2(c.monthlySavingsRefiOnly) + ' a month'
+          : 'Costs ' + fmt$2(-c.monthlySavingsRefiOnly) + ' more a month',
+        delta: c.monthlySavingsRefiOnly
+      },
+      {
+        title: 'Refinance + consolidate', value: c.monthlyConsolidated,
+        sub: 'One payment, ' + summary.count + ' account' + (summary.count === 1 ? '' : 's') + ' closed',
+        delta: c.monthlySavingsConsolidated, highlight: true
+      }
+    ];
+
+    var colsHtml = '<div class="outlay-grid">' + columns.map(function (col) {
+      return '<div class="outlay-col' + (col.highlight ? ' is-highlight' : '') + '">' +
+        '<div class="outlay-title">' + esc(col.title) + '</div>' +
+        '<div class="outlay-value">' + fmt$2(col.value) + '<span class="outlay-per">/mo</span></div>' +
+        (col.delta !== undefined
+          ? '<div class="outlay-delta ' + (col.delta > 0 ? 'up' : col.delta < 0 ? 'down' : 'flat') + '">' +
+            (col.delta > 0 ? '−' : col.delta < 0 ? '+' : '') + fmt$(Math.abs(col.delta)) + '/mo</div>'
+          : '<div class="outlay-delta flat">baseline</div>') +
+        '<div class="outlay-sub">' + col.sub + '</div>' +
+        '</div>';
+    }).join('') + '</div>';
+
+    // --- Headline numbers -----------------------------------------------
+    var stats = [
+      {
+        label: 'Monthly savings if we consolidate',
+        value: fmt$2(c.monthlySavingsConsolidated),
+        sub: fmt$(c.annualSavingsConsolidated) + ' a year back in your pocket',
+        hero: true
+      },
+      {
+        label: 'From consolidating alone',
+        value: fmt$2(c.monthlySavingsFromConsolidating),
+        sub: 'On top of the ' + fmt$2(c.monthlySavingsRefiOnly) + ' the refinance itself saves',
+        cls: c.monthlySavingsFromConsolidating > 0 ? 'is-good' : ''
+      },
+      {
+        label: 'Debt rolled in', value: fmt$(summary.totalBalance),
+        sub: summary.count + ' account' + (summary.count === 1 ? '' : 's') +
+          ' · new loan ' + fmt$(c.newPrincipalConsolidated)
+      },
+      {
+        label: 'Blended rate today', value: fmtPct(c.blendedRateBefore, 2),
+        sub: 'Mortgage and debts combined, versus ' + fmtPct(c.newRate, 3) + ' on the new loan',
+        tip: 'The balance-weighted average rate across your mortgage and every debt. It is what you are really paying to borrow.',
+        cls: c.blendedRateBefore > c.newRate ? 'is-good' : ''
+      }
+    ];
+
+    // --- The honest counterpoint ------------------------------------------
+    var caveat;
+    if (!isFinite(summary.totalInterest)) {
+      caveat = '<div class="callout is-warn"><svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3l9 16H3z"/><line x1="12" y1="10" x2="12" y2="14"/><line x1="12" y1="17" x2="12" y2="17"/></svg>' +
+        '<div><strong>At least one of these never gets paid off.</strong> The payment does not cover the ' +
+        'interest accruing on the balance, so it grows instead of shrinking. Consolidating is not just a ' +
+        'cash-flow move here — it is the only way that balance ever clears.</div></div>';
+    } else if (c.lifetimeInterestDelta > 0) {
+      caveat = '<div class="callout is-warn"><svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3l9 16H3z"/><line x1="12" y1="10" x2="12" y2="14"/><line x1="12" y1="17" x2="12" y2="17"/></svg>' +
+        '<div><strong>Lower payment, more interest over time.</strong> Paid on their own schedules these ' +
+        'debts cost ' + fmt$(summary.totalInterest) + ' in interest and are gone in ' +
+        fmtDuration(summary.longestMonths) + '. Spread across ' +
+        fmtDuration(c.withConsolidation.newSchedule.months) + ' of mortgage they cost ' +
+        fmt$(c.interestOnConsolidatedDebt) + ' — about ' + fmt$(c.lifetimeInterestDelta) +
+        ' more. The monthly relief is real; so is that number. Keep paying the old amount toward ' +
+        'principal and you claw most of it back.</div></div>';
+    } else {
+      caveat = '<div class="callout is-good"><svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+        '<div><strong>Cheaper monthly and cheaper overall.</strong> These balances cost ' +
+        fmt$(summary.totalInterest) + ' in interest on their own schedules. Rolled into the loan at ' +
+        fmtPct(c.newRate, 3) + ' they cost ' + fmt$(c.interestOnConsolidatedDebt) + ' — ' +
+        fmt$(Math.abs(c.lifetimeInterestDelta)) + ' less, on top of the monthly saving.</div></div>';
+    }
+
+    // --- Per-creditor detail -----------------------------------------------
+    var table = '<div class="table-scroll mt-20"><table class="data">' +
+      '<thead><tr><th>Creditor</th><th>Balance</th><th>Payment</th><th>Rate</th>' +
+      '<th>Paid off in</th><th>Interest if you keep it</th></tr></thead><tbody>' +
+      summary.rows.map(function (d) {
+        return '<tr' + (d.neverPaysOff ? ' class="is-pmi-drop"' : '') + '>' +
+          '<td><strong>' + esc(d.creditor) + '</strong></td>' +
+          '<td>' + fmt$(d.balance) + '</td>' +
+          '<td>' + fmt$2(d.payment) + '</td>' +
+          '<td>' + fmtPct(d.rate, 2) + '</td>' +
+          '<td>' + (d.neverPaysOff
+            ? '<span class="delta-pill down">never at this payment</span>'
+            : fmtDuration(d.months)) + '</td>' +
+          '<td class="' + (d.neverPaysOff ? 'text-bad' : 'num-interest') + '">' +
+          (d.neverPaysOff ? 'Balance grows' : fmt$(d.totalInterest)) + '</td></tr>';
+      }).join('') +
+      '</tbody><tfoot><tr><td>Totals</td><td>' + fmt$(summary.totalBalance) + '</td>' +
+      '<td>' + fmt$2(summary.totalMonthly) + '</td>' +
+      '<td>' + fmtPct(summary.blendedRate, 2) + '</td><td></td>' +
+      '<td>' + (isFinite(summary.totalInterest) ? fmt$(summary.totalInterest) : '—') +
+      '</td></tr></tfoot></table></div>';
+
+    box.innerHTML = colsHtml +
+      '<div class="stat-grid mt-20">' + stats.map(statHTML).join('') + '</div>' +
+      '<div class="mt-20">' + caveat + '</div>' +
+      table;
+  }
+
   function renderRefi() {
     var cur = currentLoanInputs();
     var r = F.analyzeRefinance({
@@ -881,6 +1070,7 @@
       pointsPct: val('points'),
       rollIntoLoan: $('rollIn').getAttribute('aria-checked') === 'true',
       cashOut: val('cashOut'),
+      debtPayoff: consolidating() ? F.summarizeDebts(debtsConfig()).totalBalance : 0,
       start: F.todayYM(),
       investmentReturnPct: val('investReturn'),
       yearsInHome: val('yearsInHome')
@@ -1009,6 +1199,7 @@
           'the longer term is doing some of the work.') +
       '</div></div>';
 
+    renderConsolidation(cur);
     renderRefiCompare(r);
     renderKeepSame(r);
     renderBuydown(r);
@@ -1416,6 +1607,13 @@
     p.set('pmi', $('pmiEnabled').getAttribute('aria-checked'));
     p.set('bw', $('biweekly').getAttribute('aria-checked'));
     p.set('roll', $('rollIn').getAttribute('aria-checked'));
+    p.set('cons', $('consolidateDebts').getAttribute('aria-checked'));
+    if (state.debts.length) {
+      p.set('debts', state.debts.map(function (d) {
+        return [encodeURIComponent(d.creditor || ''), parseNum(d.balance),
+          parseNum(d.payment), parseNum(d.rate)].join('.');
+      }).join('~'));
+    }
     p.set('tm', state.taxMode);
     if (state.oneTime.length) {
       p.set('ot', state.oneTime.map(function (o) {
@@ -1451,12 +1649,24 @@
     if (p.has('pmi')) { setSwitch($('pmiEnabled'), p.get('pmi') === 'true'); $('pmiEnabled').dataset.userSet = '1'; }
     if (p.has('bw')) setSwitch($('biweekly'), p.get('bw') === 'true');
     if (p.has('roll')) setSwitch($('rollIn'), p.get('roll') === 'true');
+    if (p.has('cons')) setSwitch($('consolidateDebts'), p.get('cons') === 'true');
+    if (p.has('debts')) {
+      state.debts = p.get('debts').split('~').map(function (chunk) {
+        var parts = chunk.split('.');
+        return {
+          creditor: decodeURIComponent(parts[0] || ''),
+          balance: parts[1] || '', payment: parts[2] || '', rate: parts[3] || ''
+        };
+      });
+      renderDebtList();
+    }
     if (p.has('ot')) {
       state.oneTime = p.get('ot').split('~').map(function (chunk) {
         var parts = chunk.split('.');
         return { amount: parseNum(parts[0]), year: parseInt(parts[1], 10), month: parseInt(parts[2], 10) };
       }).filter(function (o) { return isFinite(o.year); });
       renderOneTimeList();
+    renderDebtList();
     }
     if (p.has('sidePayment')) state.sideTouched = true;
     if (p.has('customTermMonths')) $('customTermMonths').value = p.get('customTermMonths');
@@ -1642,6 +1852,7 @@
       var now = F.todayYM();
       state.oneTime.push({ amount: 5000, year: now.year + 1, month: now.month });
       renderOneTimeList();
+    renderDebtList();
       recalcAll();
     });
     $('oneTimeList').addEventListener('input', handleOneTimeChange);
@@ -1651,6 +1862,27 @@
       if (!btn) return;
       state.oneTime.splice(parseInt(btn.dataset.i, 10), 1);
       renderOneTimeList();
+    renderDebtList();
+      recalcAll();
+    });
+
+    // Debts (delegated — the list is re-rendered on add/remove)
+    $('btnAddDebt').addEventListener('click', function () {
+      state.debts.push({ creditor: '', balance: '', payment: '', rate: '' });
+      renderDebtList();
+      var inputs = $$('#debtList [data-debt="creditor"]');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+      recalcAll();
+    });
+    $('debtList').addEventListener('input', handleDebtChange);
+    $('debtList').addEventListener('focusout', formatDelegatedCurrency);
+    $('oneTimeList').addEventListener('focusout', formatDelegatedCurrency);
+    $('debtList').addEventListener('change', handleDebtChange);
+    $('debtList').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-debt="remove"]');
+      if (!btn) return;
+      state.debts.splice(parseInt(btn.dataset.i, 10), 1);
+      renderDebtList();
       recalcAll();
     });
 
@@ -1685,6 +1917,29 @@
     if (!state.oneTime[i]) return;
     var key = elx.dataset.ot;
     state.oneTime[i][key] = key === 'amount' ? parseNum(elx.value) : parseInt(elx.value, 10);
+    recalcSoon();
+  }
+
+  /** Comma-format a currency field in a dynamically rendered row on blur. */
+  function formatDelegatedCurrency(e) {
+    var elx = e.target;
+    var key = elx.dataset ? (elx.dataset.debt || elx.dataset.ot) : null;
+    if (key !== 'balance' && key !== 'payment' && key !== 'amount') return;
+    if (elx.value.trim() === '') return;
+    var n = parseNum(elx.value);
+    elx.value = num0.format(Math.round(n * 100) / 100);
+    if (elx.dataset.debt) {
+      var i = parseInt(elx.dataset.i, 10);
+      if (state.debts[i]) state.debts[i][key] = elx.value;
+    }
+  }
+
+  function handleDebtChange(e) {
+    var elx = e.target.closest('[data-debt]');
+    if (!elx || elx.dataset.debt === 'remove') return;
+    var i = parseInt(elx.dataset.i, 10);
+    if (!state.debts[i]) return;
+    state.debts[i][elx.dataset.debt] = elx.value;
     recalcSoon();
   }
 
@@ -1792,6 +2047,7 @@
     initBranding();
     renderScenarioInputs();
     renderOneTimeList();
+    renderDebtList();
 
     var fromUrl = readUrl();
     if (!fromUrl) syncFromPrice();

@@ -781,6 +781,30 @@
           </div>
         </div>
       </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Debts to consolidate</h2>
+            <div class="sub">Credit cards, auto, student, personal loans</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="debtList"></div>
+          <button class="btn btn-ghost btn-sm btn-block" id="btnAddDebt" type="button">+ Add a debt</button>
+
+          <div class="field mt-16 mb-0">
+            <div class="switch-row" style="border-top:1px solid var(--border);padding-top:14px">
+              <span class="switch-label">
+                Include these in the refinance
+                <button class="info" type="button" tabindex="0" data-tip="On: the balances are paid off at closing and added to the new loan, so the separate payments go away. Off: you keep paying them yourself and the refinance covers only the mortgage.">i</button>
+              </span>
+              <button class="switch" id="consolidateDebts" role="switch" aria-checked="true" aria-label="Include debts in the refinance"></button>
+            </div>
+            <div class="hint" id="consolidateHint"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div>
@@ -800,6 +824,16 @@
           <div class="legend" id="refiLegend"></div>
           <div id="refiBreakEvenNote" class="mt-16"></div>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Debt consolidation</h2>
+            <div class="sub">What your total monthly outlay looks like with and without rolling these balances in</div>
+          </div>
+        </div>
+        <div class="card-body" id="consolidationResult"></div>
       </div>
 
       <div class="card">

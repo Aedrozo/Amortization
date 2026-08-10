@@ -593,17 +593,20 @@
     var pointsPct = Math.max(0, num(opts.pointsPct));
     var flatCosts = Math.max(0, num(opts.closingCosts));
     var cashOut = Math.max(0, num(opts.cashOut));
+    // Consumer debt being paid off at closing. Behaves like cash-out for sizing
+    // the new loan, but it discharges a liability instead of landing in pocket.
+    var debtPayoff = Math.max(0, num(opts.debtPayoff));
     var rollIn = !!opts.rollIntoLoan;
 
     // Points are quoted against the new loan amount, which itself depends on
     // whether costs are rolled in — solve the small circular reference directly.
-    // L = balance + cashOut + roll * (flat + points% * L)
+    // L = balance + cashOut + debtPayoff + roll * (flat + points% * L)
     var newPrincipal;
     if (rollIn) {
       var p = pointsPct / 100;
-      newPrincipal = (balance + cashOut + flatCosts) / (1 - p);
+      newPrincipal = (balance + cashOut + debtPayoff + flatCosts) / (1 - p);
     } else {
-      newPrincipal = balance + cashOut;
+      newPrincipal = balance + cashOut + debtPayoff;
     }
     newPrincipal = round2(newPrincipal);
     var pointsCost = round2(newPrincipal * (pointsPct / 100));
@@ -643,8 +646,9 @@
       if (cRow) { curPaid += cRow.payment; curBal = cRow.balance; curInterest += cRow.interest; }
       if (nRow) { newPaid += nRow.payment + nRow.extra; newBal = nRow.balance; newInterest += nRow.interest; }
       var curCost = curPaid + curBal;
-      // Cash-out proceeds are money in the borrower's pocket, not a cost.
-      var newCost = newPaid + newBal - cashOut;
+      // Cash-out proceeds are money in the borrower's pocket, and a debt paid
+      // off at closing discharges a liability of equal size — neither is a cost.
+      var newCost = newPaid + newBal - cashOut - debtPayoff;
 
       // Interest is the only part of a payment the borrower never gets back —
       // principal is equity. Measuring the refinance against interest avoided
@@ -701,6 +705,7 @@
       totalCosts: totalCosts,
       cashAtClosing: cashAtClosing,
       cashOut: cashOut,
+      debtPayoff: debtPayoff,
       currentPayment: currentPayment,
       newPayment: newPayment,
       monthlySavings: monthlySavings,
@@ -737,6 +742,138 @@
         ? 'The new rate is higher than the current rate.'
         : null
     };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Debt consolidation
+   * ------------------------------------------------------------------ */
+
+  /**
+   * Summarize a list of consumer debts.
+   *
+   * debts = [{ creditor, balance, payment, rate }]
+   *
+   * `rate` is optional. When it is zero we treat the debt as interest-free and
+   * the payoff is simply balance / payment. When the payment does not cover the
+   * monthly interest the debt never retires — that is flagged rather than
+   * silently turned into a huge number, because minimum credit-card payments
+   * genuinely behave this way.
+   */
+  function summarizeDebts(debts) {
+    var rows = [];
+    var totalBalance = 0, totalMonthly = 0, totalInterest = 0;
+    var weighted = 0, anyNeverPaysOff = false, longestMonths = 0;
+
+    (debts || []).forEach(function (d) {
+      if (!d) return;
+      var balance = Math.max(0, num(d.balance));
+      var pmt = Math.max(0, num(d.payment));
+      var rate = Math.max(0, num(d.rate));
+      if (balance <= 0 && pmt <= 0) return;
+
+      var months = monthsToPayoff(balance, rate, pmt);
+      var neverPaysOff = !isFinite(months);
+      var interest = neverPaysOff ? Infinity : round2(pmt * months - balance);
+      if (!neverPaysOff && months > longestMonths) longestMonths = months;
+      if (neverPaysOff) anyNeverPaysOff = true;
+
+      rows.push({
+        creditor: d.creditor || 'Debt',
+        balance: balance,
+        payment: pmt,
+        rate: rate,
+        months: months,
+        neverPaysOff: neverPaysOff,
+        totalInterest: interest,
+        // Share of the borrower's monthly debt service this line represents.
+        paymentToBalance: balance > 0 ? round4((pmt / balance) * 100) : 0
+      });
+
+      totalBalance += balance;
+      totalMonthly += pmt;
+      if (isFinite(interest)) totalInterest += interest;
+      weighted += balance * rate;
+    });
+
+    return {
+      rows: rows,
+      count: rows.length,
+      totalBalance: round2(totalBalance),
+      totalMonthly: round2(totalMonthly),
+      totalInterest: anyNeverPaysOff ? Infinity : round2(totalInterest),
+      blendedRate: totalBalance > 0 ? round4(weighted / totalBalance) : 0,
+      anyNeverPaysOff: anyNeverPaysOff,
+      longestMonths: longestMonths
+    };
+  }
+
+  /**
+   * Compare refinancing with and without folding consumer debt into the loan.
+   *
+   * Takes every option `analyzeRefinance` accepts plus `debts`. Runs the
+   * refinance both ways and reports the monthly cash-flow difference — which is
+   * what the borrower feels — alongside the lifetime interest consequence,
+   * which usually points the other way and should not be buried.
+   */
+  function analyzeConsolidation(opts) {
+    opts = opts || {};
+    var debts = summarizeDebts(opts.debts);
+
+    var without = analyzeRefinance(Object.assign({}, opts, { debtPayoff: 0 }));
+    var withC = analyzeRefinance(Object.assign({}, opts, { debtPayoff: debts.totalBalance }));
+
+    var currentMortgage = without.currentPayment;
+
+    // Monthly outlay under each path (mortgage principal & interest plus any
+    // consumer debt service that survives).
+    var monthlyToday = round2(currentMortgage + debts.totalMonthly);
+    var monthlyRefiOnly = round2(without.newPayment + debts.totalMonthly);
+    var monthlyConsolidated = round2(withC.newPayment);
+
+    // The extra mortgage interest created purely by carrying the debt balance
+    // for the mortgage term.
+    var interestOnConsolidatedDebt = round2(withC.newTotalInterest - without.newTotalInterest);
+
+    return {
+      debts: debts,
+      withoutConsolidation: without,
+      withConsolidation: withC,
+
+      monthlyToday: monthlyToday,
+      monthlyRefiOnly: monthlyRefiOnly,
+      monthlyConsolidated: monthlyConsolidated,
+
+      // Headline: what the borrower stops paying out each month.
+      monthlySavingsConsolidated: round2(monthlyToday - monthlyConsolidated),
+      monthlySavingsRefiOnly: round2(monthlyToday - monthlyRefiOnly),
+      // The slice of the saving that consolidation itself contributes.
+      monthlySavingsFromConsolidating: round2(monthlyRefiOnly - monthlyConsolidated),
+      annualSavingsConsolidated: round2((monthlyToday - monthlyConsolidated) * 12),
+
+      newPrincipalConsolidated: withC.newPrincipal,
+      newPrincipalRefiOnly: without.newPrincipal,
+
+      // Interest side of the ledger.
+      interestIfDebtsKept: debts.totalInterest,
+      interestOnConsolidatedDebt: interestOnConsolidatedDebt,
+      lifetimeInterestDelta: isFinite(debts.totalInterest)
+        ? round2(interestOnConsolidatedDebt - debts.totalInterest)
+        : -Infinity,
+      blendedRateBefore: blendedRate(currentMortgage, without, debts),
+      newRate: num(opts.newRate)
+    };
+  }
+
+  /**
+   * Balance-weighted average rate across the mortgage and every consumer debt —
+   * the number that shows why a 6% mortgage plus 24% cards is not a 6% problem.
+   */
+  function blendedRate(currentPayment, refi, debts) {
+    var mortgageBalance = refi.currentSchedule.principal;
+    var mortgageRate = refi.currentSchedule.annualRate;
+    var total = mortgageBalance + debts.totalBalance;
+    if (total <= 0) return 0;
+    return round4((mortgageBalance * mortgageRate + debts.totalBalance * debts.blendedRate) / total);
   }
 
   /**
@@ -802,6 +939,8 @@
     extraNeededForTerm: extraNeededForTerm,
     sensitivity: sensitivity,
     analyzeRefinance: analyzeRefinance,
+    summarizeDebts: summarizeDebts,
+    analyzeConsolidation: analyzeConsolidation,
     analyzeBuydown: analyzeBuydown,
     currentLoanFromOrigination: currentLoanFromOrigination
   };

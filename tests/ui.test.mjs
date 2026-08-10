@@ -481,6 +481,177 @@ test('the refinance tab discloses an APR for the new loan', async () => {
   await page.waitForTimeout(300);
 });
 
+/* ------------------------------------------------------------------ */
+/* Debt consolidation                                                  */
+/* ------------------------------------------------------------------ */
+
+const DEBT_ROWS = [
+  ['Visa', '14000', '420', '24.99'],
+  ['Auto loan', '22000', '540', '8.5'],
+  ['Student loan', '31000', '330', '6.8']
+];
+
+async function addDebts() {
+  await page.click('#tab-refi');
+  await page.waitForTimeout(400);
+  for (let i = 0; i < DEBT_ROWS.length; i++) {
+    await page.click('#btnAddDebt');
+    await page.waitForTimeout(200);
+    await page.fill(`[data-debt="creditor"][data-i="${i}"]`, DEBT_ROWS[i][0]);
+    await page.fill(`[data-debt="balance"][data-i="${i}"]`, DEBT_ROWS[i][1]);
+    await page.fill(`[data-debt="payment"][data-i="${i}"]`, DEBT_ROWS[i][2]);
+    await page.fill(`[data-debt="rate"][data-i="${i}"]`, DEBT_ROWS[i][3]);
+    await page.waitForTimeout(150);
+  }
+  await page.waitForTimeout(500);
+}
+
+const outlay = () => page.$$eval('#consolidationResult .outlay-col', els => els.map(e => ({
+  title: e.querySelector('.outlay-title').textContent.trim(),
+  value: e.querySelector('.outlay-value').textContent.trim(),
+  delta: e.querySelector('.outlay-delta').textContent.trim()
+})));
+
+test('consolidation starts empty and invites input', async () => {
+  await page.click('#tab-refi');
+  await page.waitForTimeout(400);
+  const t = await text('#consolidationResult');
+  assert.match(t, /Add a debt on the left/i);
+});
+
+test('adding debts produces the three-way monthly comparison', async () => {
+  await addDebts();
+  const cols = await outlay();
+  assert.equal(cols.length, 3);
+  assert.match(cols[0].title, /Today/i);
+  assert.match(cols[1].title, /Refinance only/i);
+  assert.match(cols[2].title, /consolidate/i);
+
+  const v = cols.map(c => money(c.value));
+  assert.ok(v[0] > v[1], 'refinancing alone lowers the outlay');
+  assert.ok(v[1] > v[2], 'consolidating lowers it further');
+
+  // Today = current mortgage payment + the three debt payments (1,290).
+  const stats = await page.$$eval('#refiStats .stat', els => els.map(e => ({
+    label: e.querySelector('.stat-label').textContent.trim(),
+    value: e.querySelector('.stat-value').textContent.trim()
+  })));
+  assert.ok(stats.length > 0);
+});
+
+test('monthly savings reconciles with the three columns', async () => {
+  const cols = await outlay();
+  const today = money(cols[0].value), consolidated = money(cols[2].value);
+  const stats = await page.$$eval('#consolidationResult .stat', els => els.map(e => ({
+    label: e.querySelector('.stat-label').textContent.trim(),
+    value: e.querySelector('.stat-value').textContent.trim()
+  })));
+  const saving = stats.find(s => /Monthly savings if we consolidate/i.test(s.label));
+  assert.ok(saving, 'headline saving is shown');
+  assert.ok(Math.abs(money(saving.value) - (today - consolidated)) < 0.02,
+    'saving equals today minus the consolidated payment');
+  assert.ok(money(saving.value) > 1000, `expected a large saving, got ${saving.value}`);
+
+  const rolled = stats.find(s => /Debt rolled in/i.test(s.label));
+  assert.equal(money(rolled.value), 67000, 'total balance rolled in');
+});
+
+test('per-creditor table shows payoff time and interest if kept', async () => {
+  const rows = await page.$$eval('#consolidationResult table.data tbody tr',
+    els => els.map(e => Array.from(e.querySelectorAll('td')).map(td => td.textContent.trim())));
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0][0], 'Visa');
+  assert.equal(money(rows[0][1]), 14000);
+  assert.match(rows[0][4], /yr|mo/, 'payoff time is a duration');
+  assert.ok(money(rows[0][5]) > 0, 'interest if kept is quoted');
+
+  const foot = await page.$$eval('#consolidationResult table.data tfoot td',
+    els => els.map(e => e.textContent.trim()));
+  assert.equal(money(foot[1]), 67000);
+  assert.equal(money(foot[2]), 1290);
+});
+
+test('the interest consequence of consolidating is not buried', async () => {
+  const t = (await text('#consolidationResult .callout')).replace(/\s+/g, ' ');
+  assert.match(t, /more interest over time/i,
+    'stretching short debt over 30 years must be called out');
+  assert.ok(/\$[\d,]+/.test(t), 'quotes the actual dollar difference');
+});
+
+test('excluding the debts changes the whole refinance, not just a label', async () => {
+  const withOn = await outlay();
+  const loanOn = await page.$$eval('#refiCompareWrap tbody tr',
+    els => els.map(e => Array.from(e.querySelectorAll('td')).map(td => td.textContent.trim())));
+  const principalOn = money(loanOn.find(r => /Loan amount/i.test(r[0]))[2]);
+
+  await page.click('#consolidateDebts');
+  await page.waitForTimeout(600);
+
+  const loanOff = await page.$$eval('#refiCompareWrap tbody tr',
+    els => els.map(e => Array.from(e.querySelectorAll('td')).map(td => td.textContent.trim())));
+  const principalOff = money(loanOff.find(r => /Loan amount/i.test(r[0]))[2]);
+
+  assert.equal(principalOn - principalOff, 67000,
+    'the toggle moves the debt balances in and out of the new loan');
+
+  const hint = await text('#consolidateHint');
+  assert.match(hint, /keep paying these separately/i);
+
+  // The comparison itself still shows both paths so the choice stays informed.
+  const cols = await outlay();
+  assert.equal(cols.length, 3);
+  assert.equal(cols[2].value, withOn[2].value,
+    'the consolidated column is unchanged — it is the comparison, not the selection');
+
+  await page.click('#consolidateDebts');
+  await page.waitForTimeout(500);
+});
+
+test('a debt whose payment cannot cover its interest is flagged', async () => {
+  await page.fill('[data-debt="balance"][data-i="0"]', '20000');
+  await page.fill('[data-debt="payment"][data-i="0"]', '200');
+  await page.fill('[data-debt="rate"][data-i="0"]', '26');
+  await page.waitForTimeout(600);
+
+  const rows = await page.$$eval('#consolidationResult table.data tbody tr',
+    els => els.map(e => Array.from(e.querySelectorAll('td')).map(td => td.textContent.trim())));
+  assert.match(rows[0][4], /never at this payment/i);
+  assert.match(rows[0][5], /Balance grows/i);
+
+  const callout = await text('#consolidationResult .callout');
+  assert.match(callout, /never gets paid off/i);
+
+  await page.fill('[data-debt="balance"][data-i="0"]', '14000');
+  await page.fill('[data-debt="payment"][data-i="0"]', '420');
+  await page.fill('[data-debt="rate"][data-i="0"]', '24.99');
+  await page.waitForTimeout(500);
+});
+
+test('debts survive a share link round-trip', async () => {
+  const hash = await page.evaluate(() => location.hash);
+  assert.ok(hash.includes('debts='), 'debts are encoded in the URL');
+  const p2 = await browser.newPage();
+  await p2.goto(BASE + hash, { waitUntil: 'networkidle' });
+  await p2.click('#tab-refi');
+  await p2.waitForTimeout(700);
+  const names = await p2.$$eval('[data-debt="creditor"]', els => els.map(e => e.value));
+  assert.deepEqual(names, ['Visa', 'Auto loan', 'Student loan']);
+  const cols = await p2.$$eval('#consolidationResult .outlay-col',
+    els => els.map(e => e.querySelector('.outlay-value').textContent.trim()));
+  assert.equal(cols.length, 3, 'the restored scenario recomputes');
+  await p2.close();
+});
+
+test('removing a debt updates the totals', async () => {
+  await page.click('[data-debt="remove"][data-i="2"]');
+  await page.waitForTimeout(600);
+  const rows = await page.$$eval('#consolidationResult table.data tbody tr', els => els.length);
+  assert.equal(rows, 2);
+  const foot = await page.$$eval('#consolidationResult table.data tfoot td',
+    els => els.map(e => e.textContent.trim()));
+  assert.equal(money(foot[1]), 36000, '14,000 + 22,000 after removing the student loan');
+});
+
 test('no tab overflows horizontally at any viewport width', async () => {
   // A stray horizontal scrollbar is the classic mobile regression; check the
   // real thing rather than trusting the media queries.
