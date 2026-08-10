@@ -1,0 +1,22 @@
+{
+  "name": "gem-home-team-mortgage-calculator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mortgage amortization, extra-payment and refinance calculator suite for Gem Home Team Mortgage Lending.",
+  "scripts": {
+    "test": "node --test tests/finance.test.mjs",
+    "test:ui": "node --test tests/ui.test.mjs",
+    "test:all": "node --test tests/finance.test.mjs && node --test tests/ui.test.mjs",
+    "start": "python3 -m http.server 8080"
+  },
+  "keywords": [
+    "mortgage",
+    "amortization",
+    "refinance",
+    "calculator"
+  ],
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}

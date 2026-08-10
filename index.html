@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mortgage &amp; Refinance Calculator | Gem Home Team Mortgage Lending</title>
+<meta name="description" content="Full mortgage amortization calculator with extra-payment savings, payoff dates, PMI drop-off, side-by-side payment comparison and refinance break-even analysis. From Gem Home Team Mortgage Lending.">
+<meta name="theme-color" content="#0b2a3c">
+<meta property="og:title" content="Mortgage &amp; Refinance Calculator | Gem Home Team">
+<meta property="og:description" content="See your true payment, payoff date, and exactly how much you save with extra payments or a refinance.">
+<meta property="og:type" content="website">
+<!-- No webfont request: the type stack below resolves locally, so the page renders
+     identically offline, behind a firewall, or embedded in a CMS. -->
+<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+
+<!-- =============================================================
+     Reusable brand marks
+     ============================================================= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- Gem Home Team lockup -->
+    <symbol id="mark-gem" viewBox="0 0 460 78">
+      <path fill="currentColor" d="M36 4 L70 33 L62 33 L62 66 Q62 72 56 72 L16 72 Q10 72 10 66 L10 33 L2 33 Z"/>
+      <path fill="#2bb3e8" d="M36 40 L46 50 L36 60 L26 50 Z"/>
+      <text x="92" y="44" font-family="Inter, sans-serif" font-size="34" font-weight="800"
+            letter-spacing="0.4" fill="currentColor">GEM HOME TEAM</text>
+      <text x="94" y="66" font-family="Inter, sans-serif" font-size="14" font-weight="700"
+            letter-spacing="5.2" fill="#2bb3e8">MORTGAGE LENDING</text>
+    </symbol>
+
+    <!-- NEO Home Loans, powered by Better -->
+    <symbol id="mark-neo" viewBox="0 0 300 84">
+      <!-- Flat-top hexagon; the round stroke join softens the corners. -->
+      <path fill="currentColor" stroke="currentColor" stroke-width="9" stroke-linejoin="round"
+            d="M18 13 L46 13 L60 42 L46 71 L18 71 L4 42 Z"/>
+      <!-- Butterfly counterform knocked out of the hexagon -->
+      <path style="fill:var(--brand-knockout)" d="M17 25 L32 42 L17 59 Z M47 25 L32 42 L47 59 Z"/>
+      <text x="76" y="40" font-family="Inter, sans-serif" font-size="33" font-weight="800"
+            letter-spacing="0.5" fill="currentColor">NEO</text>
+      <text x="78" y="56" font-family="Inter, sans-serif" font-size="11" font-weight="700"
+            letter-spacing="4.2" fill="currentColor">HOME LOANS</text>
+      <text x="76" y="78" font-family="Inter, sans-serif" font-size="15" font-weight="500"
+            fill="currentColor">powered by <tspan font-weight="800">Better</tspan></text>
+    </symbol>
+
+    <!-- Equal Housing Opportunity -->
+    <symbol id="mark-eho" viewBox="0 0 64 64">
+      <path fill="currentColor" d="M32 8 L60 28 L54 28 L54 56 L38 56 L38 40 L26 40 L26 56 L10 56 L10 28 L4 28 Z"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- =============================================================
+     Header
+     ============================================================= -->
+<header class="site-header">
+  <div class="wrap header-inner">
+    <div class="brand-lockup">
+      <svg viewBox="0 0 460 78" style="color:var(--brand-ink)" role="img" aria-label="Gem Home Team Mortgage Lending">
+        <use href="#mark-gem"></use>
+      </svg>
+      <span class="brand-x" aria-hidden="true">✕</span>
+      <span class="brand-partner">
+        <svg viewBox="0 0 300 84" style="color:var(--brand-ink)" role="img" aria-label="NEO Home Loans, powered by Better">
+          <use href="#mark-neo"></use>
+        </svg>
+      </span>
+    </div>
+    <div class="header-actions no-print">
+      <button class="icon-btn" id="btnShare" type="button" title="Copy a link to this exact scenario">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        <span class="btn-text">Share</span>
+      </button>
+      <button class="icon-btn" id="btnPrint" type="button" title="Print or save as PDF">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        <span class="btn-text">Print</span>
+      </button>
+      <button class="icon-btn" id="btnTheme" type="button" title="Toggle dark mode" aria-label="Toggle dark mode">
+        <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- =============================================================
+     Hero + tab bar
+     ============================================================= -->
+<section class="hero">
+  <div class="wrap">
+    <h1 class="hero-title">Know your loan <span class="accent">to the penny.</span></h1>
+    <p class="hero-sub">A complete amortization, payoff and refinance toolkit — every payment, every dollar
+      of interest, and exactly what you save by paying a little extra. Nothing is sent anywhere; every
+      calculation runs right in your browser.</p>
+
+    <div class="tabs" role="tablist" aria-label="Calculator sections">
+      <button class="tab" role="tab" id="tab-payment" aria-controls="panel-payment" aria-selected="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Payment &amp; Schedule
+      </button>
+      <button class="tab" role="tab" id="tab-extra" aria-controls="panel-extra" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        Extra Payments
+      </button>
+      <button class="tab" role="tab" id="tab-side" aria-controls="panel-side" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+        Side-by-Side
+      </button>
+      <button class="tab" role="tab" id="tab-refi" aria-controls="panel-refi" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0114.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0020.5 15"/></svg>
+        Refinance
+      </button>
+      <button class="tab" role="tab" id="tab-compare" aria-controls="panel-compare" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Compare Loans
+      </button>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+
+<!-- =============================================================
+     TAB 1 — Payment & Schedule
+     ============================================================= -->
+<section class="tab-panel" id="panel-payment" role="tabpanel" aria-labelledby="tab-payment">
+  <div class="layout">
+
+    <!-- ---------- Inputs ---------- -->
+    <div class="sticky-col no-print">
+      <div class="card">
+        <div class="card-head"><h2>Loan details</h2></div>
+        <div class="card-body">
+
+          <div class="field">
+            <label class="field-label" for="homePrice">Home price</label>
+            <div class="input-wrap">
+              <span class="affix affix-left">$</span>
+              <input type="text" inputmode="decimal" id="homePrice" class="has-affix-left" value="450,000">
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="downPayment">Down payment</label>
+            <div class="field-split">
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="downPayment" class="has-affix-left" value="90,000">
+              </div>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="downPaymentPct" class="has-affix-right" value="20">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="range-row">
+              <input type="range" id="downPaymentRange" min="0" max="50" step="0.5" value="20" aria-label="Down payment percentage">
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="loanAmount">
+              Loan amount
+              <button class="info" type="button" tabindex="0" data-tip="Home price minus your down payment. Edit this directly and the down payment updates to match.">i</button>
+            </label>
+            <div class="input-wrap">
+              <span class="affix affix-left">$</span>
+              <input type="text" inputmode="decimal" id="loanAmount" class="has-affix-left" value="360,000">
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="interestRate">Interest rate</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="interestRate" class="has-affix-right" value="6.5">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="loanTerm">Loan term</label>
+              <select id="loanTerm">
+                <option value="360" selected>30 years</option>
+                <option value="300">25 years</option>
+                <option value="240">20 years</option>
+                <option value="180">15 years</option>
+                <option value="120">10 years</option>
+                <option value="custom">Custom…</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field" id="customTermField" hidden>
+            <label class="field-label" for="customTermMonths">Custom term (months)</label>
+            <input type="text" inputmode="numeric" id="customTermMonths" value="360">
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="startMonth">First payment</label>
+            <div class="field-row">
+              <select id="startMonth"></select>
+              <input type="text" inputmode="numeric" id="startYear" value="2026">
+            </div>
+          </div>
+
+          <h3 class="section-title">Taxes, insurance &amp; fees</h3>
+
+          <div class="field">
+            <label class="field-label" for="propertyTax">
+              Property tax
+              <button class="info" type="button" tabindex="0" data-tip="Enter an annual dollar amount, or switch to % to have it calculated from the home price.">i</button>
+            </label>
+            <div class="field-split">
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="propertyTax" class="has-affix-left" value="5,400">
+              </div>
+              <div class="segmented full" role="group" aria-label="Property tax entry mode">
+                <button type="button" data-taxmode="amount" aria-pressed="true">$/yr</button>
+                <button type="button" data-taxmode="percent" aria-pressed="false">%</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="homeInsurance">Insurance / yr</label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="homeInsurance" class="has-affix-left" value="1,800">
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="hoaMonthly">HOA / mo</label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="hoaMonthly" class="has-affix-left" value="0">
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="switch-row">
+              <span class="switch-label">
+                Mortgage insurance (PMI)
+                <button class="info" type="button" tabindex="0" data-tip="Usually required under 20% down. By law it comes off automatically once the balance reaches 78% of the original value — this calculator tracks that date for you.">i</button>
+              </span>
+              <button class="switch" id="pmiEnabled" role="switch" aria-checked="false" aria-label="Enable PMI"></button>
+            </div>
+          </div>
+
+          <div class="field-row" id="pmiFields" hidden>
+            <div class="field">
+              <label class="field-label" for="pmiRate">PMI rate / yr</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="pmiRate" class="has-affix-right" value="0.55">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="pmiCancel">Cancels at LTV</label>
+              <select id="pmiCancel">
+                <option value="78" selected>78% (automatic)</option>
+                <option value="80">80% (on request)</option>
+              </select>
+            </div>
+          </div>
+
+          <details class="field mt-8">
+            <summary class="field-label" style="cursor:pointer;list-style:revert">Advanced assumptions</summary>
+            <div class="field-row mt-12">
+              <div class="field">
+                <label class="field-label" for="appreciation">Home appreciation / yr</label>
+                <div class="input-wrap">
+                  <input type="text" inputmode="decimal" id="appreciation" class="has-affix-right" value="3">
+                  <span class="affix affix-right">%</span>
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label" for="escrowInflation">Tax &amp; insurance inflation</label>
+                <div class="input-wrap">
+                  <input type="text" inputmode="decimal" id="escrowInflation" class="has-affix-right" value="0">
+                  <span class="affix affix-right">%</span>
+                </div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="otherMonthly">Other monthly costs</label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="otherMonthly" class="has-affix-left" value="0">
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="loanCosts">
+                Points &amp; lender fees
+                <button class="info" type="button" tabindex="0" data-tip="Prepaid finance charges — discount points, origination and other lender fees. Enter them to see an estimated APR. Third-party costs like appraisal and title are generally not finance charges.">i</button>
+              </label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="loanCosts" class="has-affix-left" value="0">
+              </div>
+              <div class="hint">Enter your prepaid finance charges to estimate APR.</div>
+            </div>
+          </details>
+
+          <button class="btn btn-ghost btn-block btn-sm mt-16" id="btnReset" type="button">Reset to defaults</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- Results ---------- -->
+    <div>
+      <div id="paymentError"></div>
+
+      <div class="card">
+        <div class="card-body">
+          <div class="headline-payment">
+            <div class="label">Total monthly payment</div>
+            <div class="value" id="totalMonthly">$0</div>
+            <div class="caption" id="paymentCaption">Principal &amp; interest, taxes, insurance</div>
+          </div>
+
+          <div class="payment-split mt-20">
+            <div class="chart-box center" id="donutChart"></div>
+            <div class="breakdown" id="paymentBreakdown"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Loan summary</h2></div>
+        <div class="card-body">
+          <div class="stat-grid" id="loanStats"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Balance, equity &amp; interest over time</h2>
+            <div class="sub">Hover the chart to inspect any month</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="chart-box" id="balanceChart"></div>
+          <div class="legend" id="balanceLegend"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Where each year's money goes</h2>
+            <div class="sub">Principal vs. interest, year by year</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="chart-box" id="splitChart"></div>
+          <div class="legend" id="splitLegend"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Milestones</h2></div>
+        <div class="card-body"><div class="timeline" id="milestones"></div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head year-toggle-row">
+          <div>
+            <h2>Amortization schedule</h2>
+            <div class="sub" id="scheduleSub">Every payment for the life of the loan</div>
+          </div>
+          <div class="row no-print">
+            <div class="segmented" role="group" aria-label="Schedule view">
+              <button type="button" data-schedview="annual" aria-pressed="true">Annual</button>
+              <button type="button" data-schedview="monthly" aria-pressed="false">Monthly</button>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="btnExportSchedule" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              CSV
+            </button>
+          </div>
+        </div>
+        <div class="card-body flush">
+          <div class="table-scroll capped" id="scheduleWrap"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================
+     TAB 2 — Extra Payments
+     ============================================================= -->
+<section class="tab-panel" id="panel-extra" role="tabpanel" aria-labelledby="tab-extra" hidden>
+  <div class="layout">
+    <div class="sticky-col no-print">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Extra payments</h2>
+            <div class="sub">Every dollar goes straight to principal</div>
+          </div>
+        </div>
+        <div class="card-body">
+
+          <div class="field">
+            <label class="field-label" for="extraMonthly">Extra each month</label>
+            <div class="input-wrap">
+              <span class="affix affix-left">$</span>
+              <input type="text" inputmode="decimal" id="extraMonthly" class="has-affix-left" value="200">
+            </div>
+            <div class="range-row">
+              <input type="range" id="extraMonthlyRange" min="0" max="2000" step="25" value="200" aria-label="Extra monthly payment">
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="extraStartMonth">
+              Starting with payment #
+              <button class="info" type="button" tabindex="0" data-tip="Leave at 1 to start immediately, or push it out if the extra payments begin later.">i</button>
+            </label>
+            <input type="text" inputmode="numeric" id="extraStartMonth" value="1">
+          </div>
+
+          <div class="field">
+            <div class="switch-row">
+              <span class="switch-label">
+                Biweekly payments
+                <button class="info" type="button" tabindex="0" data-tip="Paying half your payment every two weeks means 26 half-payments — one extra full payment every year. Modeled as an extra 1/12 of a payment each month, the way servicers apply it.">i</button>
+              </span>
+              <button class="switch" id="biweekly" role="switch" aria-checked="false" aria-label="Biweekly payments"></button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="extraAnnual">Once a year</label>
+            <div class="field-split">
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="extraAnnual" class="has-affix-left" value="0">
+              </div>
+              <select id="extraAnnualMonth"></select>
+            </div>
+            <div class="hint">Tax refund, bonus, commission check.</div>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="roundUpTo">
+              Round payment up to nearest
+              <button class="info" type="button" tabindex="0" data-tip="Rounds your principal &amp; interest payment up to the next increment and sends the difference to principal.">i</button>
+            </label>
+            <select id="roundUpTo">
+              <option value="0" selected>Don't round</option>
+              <option value="50">$50</option>
+              <option value="100">$100</option>
+              <option value="250">$250</option>
+              <option value="500">$500</option>
+            </select>
+          </div>
+
+          <h3 class="section-title">One-time payments</h3>
+          <div id="oneTimeList"></div>
+          <button class="btn btn-ghost btn-sm btn-block" id="btnAddOneTime" type="button">+ Add a lump sum</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Payoff goal</h2>
+            <div class="sub">Work backwards from a target</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label class="field-label" for="goalYears">I want to be debt-free in</label>
+            <div class="field-split">
+              <input type="text" inputmode="numeric" id="goalYears" value="20">
+              <span class="row" style="color:var(--text-3);font-size:13px;font-weight:600">years</span>
+            </div>
+          </div>
+          <button class="btn btn-dark btn-block btn-sm" id="btnGoalSeek" type="button">Calculate what it takes</button>
+          <div id="goalResult" class="mt-16"></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div id="extraError"></div>
+      <div class="stat-grid" id="savingsStats"></div>
+
+      <div class="card mt-20">
+        <div class="card-head">
+          <div>
+            <h2>Payoff race</h2>
+            <div class="sub">Your balance with and without the extra payments</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="chart-box" id="prepayChart"></div>
+          <div class="legend" id="prepayLegend"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>What if you paid a little more?</h2>
+            <div class="sub">Each row is a flat extra amount added to every payment</div>
+          </div>
+        </div>
+        <div class="card-body flush">
+          <div class="table-scroll" id="sensitivityWrap"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Accelerated schedule</h2>
+            <div class="sub" id="accelScheduleSub"></div>
+          </div>
+          <div class="row no-print">
+            <div class="segmented" role="group" aria-label="Accelerated schedule view">
+              <button type="button" data-accelview="annual" aria-pressed="true">Annual</button>
+              <button type="button" data-accelview="monthly" aria-pressed="false">Monthly</button>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="btnExportAccel" type="button">CSV</button>
+          </div>
+        </div>
+        <div class="card-body flush">
+          <div class="table-scroll capped" id="accelScheduleWrap"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================
+     TAB 3 — Side-by-Side
+     ============================================================= -->
+<section class="tab-panel" id="panel-side" role="tabpanel" aria-labelledby="tab-side" hidden>
+  <div class="card no-print">
+    <div class="card-body">
+      <div class="row wrap-gap" style="gap:20px;align-items:flex-end">
+        <div class="field mb-0" style="min-width:230px">
+          <label class="field-label" for="sidePayment">
+            Compare the minimum payment against
+            <button class="info" type="button" tabindex="0" data-tip="Enter the total principal &amp; interest you would actually pay each month. Anything above the minimum goes straight to principal.">i</button>
+          </label>
+          <div class="input-wrap">
+            <span class="affix affix-left">$</span>
+            <input type="text" inputmode="decimal" id="sidePayment" class="has-affix-left" value="0">
+          </div>
+        </div>
+        <div class="field mb-0" style="min-width:210px">
+          <label class="field-label">Or set it by the extra amount</label>
+          <div class="segmented full" role="group" aria-label="Quick extra amounts">
+            <button type="button" data-sidequick="100">+$100</button>
+            <button type="button" data-sidequick="250">+$250</button>
+            <button type="button" data-sidequick="500">+$500</button>
+            <button type="button" data-sidequick="1000">+$1k</button>
+          </div>
+        </div>
+        <div class="grow"></div>
+        <button class="btn btn-ghost btn-sm" id="btnExportSide" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export both schedules
+        </button>
+      </div>
+      <div class="hint" id="sideHint"></div>
+    </div>
+  </div>
+
+  <div id="sideError"></div>
+
+  <div class="compare-grid mt-20" id="sideHeads"></div>
+
+  <div class="stat-grid mt-20" id="sideStats"></div>
+
+  <div class="card mt-20">
+    <div class="card-head">
+      <div>
+        <h2>Balance side by side</h2>
+        <div class="sub">Where each loan stands at any point in time</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="chart-box" id="sideChart"></div>
+      <div class="legend" id="sideLegend"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head year-toggle-row">
+      <div>
+        <h2>Payment-by-payment comparison</h2>
+        <div class="sub">Both amortization schedules on one row, so you can read straight across</div>
+      </div>
+      <div class="segmented no-print" role="group" aria-label="Comparison view">
+        <button type="button" data-sideview="annual" aria-pressed="true">Annual</button>
+        <button type="button" data-sideview="monthly" aria-pressed="false">Monthly</button>
+      </div>
+    </div>
+    <div class="card-body flush">
+      <div class="table-scroll capped" id="sideTableWrap"></div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================
+     TAB 4 — Refinance
+     ============================================================= -->
+<section class="tab-panel" id="panel-refi" role="tabpanel" aria-labelledby="tab-refi" hidden>
+  <div class="layout">
+    <div class="sticky-col no-print">
+      <div class="card">
+        <div class="card-head"><h2>Your current loan</h2></div>
+        <div class="card-body">
+          <div class="segmented full mb-0" role="group" aria-label="How to enter the current loan">
+            <button type="button" data-curmode="balance" aria-pressed="true">I know my balance</button>
+            <button type="button" data-curmode="original" aria-pressed="false">Use original terms</button>
+          </div>
+
+          <div id="curBalanceMode" class="mt-16">
+            <div class="field">
+              <label class="field-label" for="curBalance">Current balance</label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="curBalance" class="has-affix-left" value="320,000">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="field-label" for="curRate">Current rate</label>
+                <div class="input-wrap">
+                  <input type="text" inputmode="decimal" id="curRate" class="has-affix-right" value="7.25">
+                  <span class="affix affix-right">%</span>
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label" for="curRemaining">Years left</label>
+                <input type="text" inputmode="decimal" id="curRemaining" value="27">
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="curPaymentOverride">
+                Current P&amp;I payment
+                <button class="info" type="button" tabindex="0" data-tip="Optional. Leave blank and we compute it from the balance, rate and term. Enter your real payment if it differs — exclude taxes and insurance.">i</button>
+              </label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="curPaymentOverride" class="has-affix-left" placeholder="Auto">
+              </div>
+            </div>
+          </div>
+
+          <div id="curOriginalMode" class="mt-16" hidden>
+            <div class="field">
+              <label class="field-label" for="origAmount">Original loan amount</label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="origAmount" class="has-affix-left" value="380,000">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="field-label" for="origRate">Original rate</label>
+                <div class="input-wrap">
+                  <input type="text" inputmode="decimal" id="origRate" class="has-affix-right" value="7.25">
+                  <span class="affix affix-right">%</span>
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label" for="origTerm">Original term</label>
+                <select id="origTerm">
+                  <option value="360" selected>30 years</option>
+                  <option value="300">25 years</option>
+                  <option value="240">20 years</option>
+                  <option value="180">15 years</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="origStartMonth">First payment was</label>
+              <div class="field-row">
+                <select id="origStartMonth"></select>
+                <input type="text" inputmode="numeric" id="origStartYear" value="2023">
+              </div>
+            </div>
+            <div class="callout is-info" id="derivedLoanNote" style="font-size:12.5px"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>The new loan</h2></div>
+        <div class="card-body">
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="newRate">New rate</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="newRate" class="has-affix-right" value="5.75">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="newTerm">New term</label>
+              <select id="newTerm">
+                <option value="360" selected>30 years</option>
+                <option value="300">25 years</option>
+                <option value="240">20 years</option>
+                <option value="180">15 years</option>
+                <option value="120">10 years</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="closingCosts">Closing costs</label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="closingCosts" class="has-affix-left" value="6,000">
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="points">
+                Points
+                <button class="info" type="button" tabindex="0" data-tip="Discount points, as a percent of the new loan amount. One point on a $300,000 loan is $3,000.">i</button>
+              </label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="points" class="has-affix-right" value="0">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="cashOut">
+              Cash out
+              <button class="info" type="button" tabindex="0" data-tip="Money you take from your equity at closing. It raises the new loan balance but it isn't a cost — you keep it.">i</button>
+            </label>
+            <div class="input-wrap">
+              <span class="affix affix-left">$</span>
+              <input type="text" inputmode="decimal" id="cashOut" class="has-affix-left" value="0">
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="switch-row">
+              <span class="switch-label">Roll costs into the loan</span>
+              <button class="switch" id="rollIn" role="switch" aria-checked="false" aria-label="Roll closing costs into the loan"></button>
+            </div>
+          </div>
+
+          <h3 class="section-title">Your plans</h3>
+
+          <div class="field">
+            <label class="field-label" for="yearsInHome">Years you'll stay in the home</label>
+            <input type="text" inputmode="decimal" id="yearsInHome" value="7">
+            <div class="range-row">
+              <input type="range" id="yearsInHomeRange" min="1" max="30" step="1" value="7" aria-label="Years in home">
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="investReturn">
+              If you invested the savings
+              <button class="info" type="button" tabindex="0" data-tip="Assumed annual return if the monthly savings were invested instead of spent.">i</button>
+            </label>
+            <div class="input-wrap">
+              <input type="text" inputmode="decimal" id="investReturn" class="has-affix-right" value="7">
+              <span class="affix affix-right">%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div id="refiError"></div>
+      <div id="refiVerdict"></div>
+      <div class="stat-grid" id="refiStats"></div>
+
+      <div class="card mt-20">
+        <div class="card-head">
+          <div>
+            <h2>When does the refinance pay for itself?</h2>
+            <div class="sub">Interest you avoid, measured against what the refinance costs</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="chart-box" id="refiChart"></div>
+          <div class="legend" id="refiLegend"></div>
+          <div id="refiBreakEvenNote" class="mt-16"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Side-by-side comparison</h2></div>
+        <div class="card-body flush">
+          <div class="table-scroll" id="refiCompareWrap"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>The power move</h2>
+            <div class="sub">Refinance to the lower rate, but keep making your old payment</div>
+          </div>
+        </div>
+        <div class="card-body"><div id="keepSameResult"></div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Is buying down the rate worth it?</h2>
+            <div class="sub">Break-even on discount points</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="field-row-3">
+            <div class="field">
+              <label class="field-label" for="bdBaseRate">Rate without points</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="bdBaseRate" class="has-affix-right" value="5.75">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="bdBuyRate">Bought-down rate</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="bdBuyRate" class="has-affix-right" value="5.25">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="bdPoints">Cost in points</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="bdPoints" class="has-affix-right" value="1">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+          </div>
+          <div id="buydownResult" class="mt-8"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================
+     TAB 5 — Compare Loans
+     ============================================================= -->
+<section class="tab-panel" id="panel-compare" role="tabpanel" aria-labelledby="tab-compare" hidden>
+  <div class="card no-print">
+    <div class="card-head">
+      <div>
+        <h2>Compare up to three loans</h2>
+        <div class="sub">15 vs. 30 year, two lenders, or the same loan with different extra payments</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btnLoadFromMain" type="button">Copy from Payment tab</button>
+    </div>
+    <div class="card-body">
+      <div class="scenario-grid" id="scenarioInputs"></div>
+    </div>
+  </div>
+
+  <div class="stat-grid mt-20" id="compareStats"></div>
+
+  <div class="card mt-20">
+    <div class="card-head">
+      <div>
+        <h2>Balance over time</h2>
+        <div class="sub">All three loans on one axis</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="chart-box" id="compareChart"></div>
+      <div class="legend" id="compareLegend"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Head to head</h2></div>
+    <div class="card-body flush">
+      <div class="table-scroll" id="compareTableWrap"></div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================
+     CTA
+     ============================================================= -->
+<section class="cta-band no-print">
+  <div class="cta-content">
+    <h2 class="cta-title">Ready to turn these numbers into a real loan?</h2>
+    <p class="cta-text">The Gem Home Team can price your scenario, lock a rate, and tell you exactly which of
+      these options makes sense for your situation. Bring your numbers — we'll do the rest.</p>
+  </div>
+  <div class="cta-actions">
+    <a class="btn btn-primary" id="ctaPrimary" href="#">Get my rate quote</a>
+    <a class="btn btn-ghost" id="ctaSecondary" href="#">Talk to a loan officer</a>
+  </div>
+</section>
+
+</main>
+
+<!-- =============================================================
+     Footer
+     ============================================================= -->
+<footer class="site-footer">
+  <div class="wrap footer-grid">
+    <div class="footer-brand">
+      <svg viewBox="0 0 460 78" style="color:var(--brand-ink)" role="img" aria-label="Gem Home Team Mortgage Lending">
+        <use href="#mark-gem"></use>
+      </svg>
+      <div class="eho">
+        <svg viewBox="0 0 64 64" style="color:var(--text-3)" aria-hidden="true"><use href="#mark-eho"></use></svg>
+        Equal Housing Opportunity
+      </div>
+    </div>
+    <div class="disclaimer">
+      <p id="licensing" class="licensing"></p>
+
+      <p class="mt-12">
+        <strong>For illustration only — this is not an offer or a commitment to lend.</strong>
+        The figures produced by this calculator are estimates generated from the information you enter.
+        They are not an advertisement of credit terms, a loan approval, a rate lock, a Loan Estimate, or a
+        commitment to lend. Rates, fees and terms shown are those you typed in; actual available rates change
+        daily and depend on credit, income, assets, occupancy, property type, loan-to-value and other factors.
+        All loans are subject to credit approval, underwriting, and property appraisal.
+      </p>
+
+      <p class="mt-8">
+        <strong>Interest rate is not APR.</strong> The rate you enter is a note rate. The Annual Percentage
+        Rate reflects the note rate plus prepaid finance charges such as points and lender fees, and will be
+        higher whenever those costs exist. Where you supply those costs, this tool estimates an APR under the
+        method in Regulation Z (12 CFR 1026.22); that estimate is not a substitute for the APR disclosed on
+        your official Loan Estimate and Closing Disclosure.
+      </p>
+
+      <p class="mt-8">
+        <strong>Assumptions.</strong> Property taxes, homeowners insurance, HOA dues and mortgage insurance
+        are estimates — your escrow amounts are set by your taxing authority, insurer and association and can
+        change over time. Interest accrues monthly and assumes every payment is made on schedule; results
+        assume a fixed rate for the full term and do not model adjustable-rate adjustments, interest-only
+        periods, temporary buydown subsidies, balloon features, or prepayment penalties. Mortgage insurance
+        cancellation follows the Homeowners Protection Act using your original property value; your servicer's
+        requirements may differ, and lender-paid or FHA mortgage insurance may not cancel at all. Refinance
+        results exclude prepaid interest, escrow reserves and per-diem charges collected at closing.
+        Refinancing may increase the total cost of your loan over its life. Consult a tax advisor regarding
+        the deductibility of interest.
+      </p>
+
+      <p class="mt-8">
+        We do not collect, transmit or store anything you type here — every calculation runs locally in your
+        browser. We are an Equal Housing Lender and do business in accordance with the Fair Housing Act and
+        the Equal Credit Opportunity Act. We do not discriminate on the basis of race, color, religion, national
+        origin, sex, marital status, familial status, disability, age, or because any part of your income comes
+        from a public assistance program.
+      </p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/finance.js"></script>
+<script src="assets/js/charts.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
