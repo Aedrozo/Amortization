@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="760" height="150" viewBox="0 0 760 150" role="img" aria-label="GEM Home Team x NEO Home Loans">
+<title>GEM Home Team × NEO Home Loans</title>
+<path d="M8 78 L48 48 L88 78 Z" fill="#0B2A38"></path>
+<path d="M17.5 78 h61 v33 a7 7 0 0 1 -7 7 h-47 a7 7 0 0 1 -7 -7 Z" fill="#0B2A38"></path>
+<rect x="40.5" y="85.5" width="15" height="15" rx="2" fill="#38C1F0" transform="rotate(45 48 93)"></rect>
+<text x="112" y="84" font-family="&#39;Plus Jakarta Sans&#39;,&#39;Helvetica Neue&#39;,Arial,sans-serif" font-size="36" font-weight="800" letter-spacing="1.8" fill="#0B2A38">GEM HOME TEAM</text>
+<text x="112" y="108" font-family="&#39;Plus Jakarta Sans&#39;,&#39;Helvetica Neue&#39;,Arial,sans-serif" font-size="14" font-weight="700" letter-spacing="3.92" fill="#1FA9DC">MORTGAGE LENDING</text>
+<text x="500" y="90" font-family="&#39;Plus Jakarta Sans&#39;,&#39;Helvetica Neue&#39;,Arial,sans-serif" font-size="26" fill="#1FA9DC">×</text>
+<image x="536" y="30" width="200" height="91" xlink:href="neo-logo-navy.png" href="neo-logo-navy.png"></image>
+</svg>
