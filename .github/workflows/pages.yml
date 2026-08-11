@@ -33,6 +33,14 @@ jobs:
       - name: Verify the calculation engine
         run: node --test tests/finance.test.mjs
 
+      # Regenerates the brand marks. Picks up real artwork dropped into
+      # assets/img/neo-logo-navy.* automatically, so replacing the traced NEO
+      # half is just a matter of committing the file. Tolerated on failure: if
+      # the toolchain is unavailable the committed marks are used as-is.
+      - name: Rebuild the brand marks
+        continue-on-error: true
+        run: npm ci --no-audit --no-fund && npm run build:logo
+
       - name: Build the single-file bundle
         run: node build.mjs dist/standalone.html
 
