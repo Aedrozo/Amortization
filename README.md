@@ -233,8 +233,12 @@ var CONFIG = {
 ```
 
 ### The logo
-The Gem Home Team, NEO Home Loans and Equal Housing Lender marks are inline SVG in the
-`<defs>` block at the top of `index.html`, between the `LOGO:START` / `LOGO:END` markers.
+The brand badge and the Equal Housing Lender mark are inline SVG in the `<defs>` block at
+the top of `index.html`, between the `LOGO:START` / `LOGO:END` markers.
+
+The badge is the supplied horizontal lockup: a rounded pill containing the cyan diamond,
+"GEM HOME TEAM", a divider rule, and the NEO hexagon with its wordmark and strapline —
+one `#mark-lockup` symbol used in both the header and the footer.
 
 **The wordmarks are vector outlines, not `<text>`.** That matters: an SVG `<text>` element
 renders in whatever font the viewer happens to have installed, so the lockup came out
@@ -259,9 +263,11 @@ cap height it reproduces the wordmark's natural width to within 1 unit (647 agai
 where Poppins came out 68 units narrow and needed heavy tracking to fill the same space —
 which is exactly what made the lockup read as mis-set.
 
-The marks recolour themselves for dark mode via the `--brand-ink` and `--brand-knockout`
-tokens, so the navy becomes light and the counterform inside the NEO hexagon follows the
-surface behind it.
+The marks recolour themselves for dark mode via the `--brand-ink`, `--brand-knockout` and
+`--brand-rule` tokens: the navy becomes light, the counterform inside the NEO hexagon
+follows the surface behind it, and the pill outline and divider track the border colour.
+The badge's interior is transparent rather than white, so it sits correctly on any
+background.
 
 If you have the original vector files, they will always beat a reconstruction — replace
 the `<use href="#mark-gem">` elements with an `<img>` pointing at them, and supply a

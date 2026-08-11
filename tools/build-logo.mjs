@@ -129,61 +129,23 @@ function note(name, run) {
 }
 
 /* ==================================================================
- * Gem Home Team — house + wordmark
- * Reference: house 127x143; "GEM HOME TEAM" 648 wide, 50 cap, baseline 65;
- * "MORTGAGE LENDING" 402 wide, 17 cap, baseline 125, centred on the wordmark.
+ * Combined horizontal badge — the supplied lockup.
+ *
+ * Reads left to right inside a rounded pill: cyan diamond, "GEM HOME TEAM",
+ * a divider rule, then the NEO hexagon with its wordmark and strapline.
+ * Coordinates are the artwork's own 640 x 100 pixel space.
  * ================================================================== */
 const gemTitle = setText(extra, 'GEM HOME TEAM',
-  { capHeight: 50, tracking: 1.25, x: 180, baseline: 65 });
-// The strapline is centred under the wordmark and widely tracked.
-const gemSub = setText(bold, 'MORTGAGE LENDING',
-  { capHeight: 16, tracking: 9.0, centreOn: (gemTitle.left + gemTitle.right) / 2, baseline: 125 });
+  { capHeight: 20, width: 280, x: 88, baseline: 60 });
 
-note('GEM HOME TEAM', gemTitle);
-note('MORTGAGE LENDING', gemSub);
-
-// House: peaked roof whose eaves overhang the walls, then a narrower body with
-// a rounded base. The overhang is the detail that reads as a house rather than
-// a pentagon — an earlier pass had the roof flush with the walls.
-const house = [
-  'M58 4',            // start just left of the apex
-  'Q63.5 -1 69 4',    // the peak is very slightly blunted, not razor sharp
-  'L127 69',          // down to the right eave
-  'L112 69',          // step back in to the wall line
-  'L112 129',
-  'Q112 143 98 143',  // rounded bottom right
-  'L29 143',
-  'Q15 143 15 129',   // rounded bottom left
-  'L15 69',
-  'L0 69',            // out to the left eave
-  'Z'
-].join(' ');
-const diamond = 'M63.5 87 L83 106 L63.5 125 L44 106 Z';
-
-const gemWidth = Math.ceil(Math.max(gemTitle.right, gemSub.right) + 2);
-const gemSymbol = `    <symbol id="mark-gem" viewBox="0 0 ${gemWidth} 145">
-      <path fill="currentColor" d="${house}"/>
-      <path fill="#2bb3e8" d="${diamond}"/>
-      <path fill="currentColor" d="${gemTitle.d}"/>
-      <path fill="#2bb3e8" d="${gemSub.d}"/>
-    </symbol>`;
-
-/* ==================================================================
- * NEO Home Loans — hexagon + wordmark
- * Reference: hexagon 155x115; "NEO" 220 wide, 52 cap, baseline 77;
- * "HOME LOANS" 200 wide, 12 cap, baseline 97;
- * "powered by Better" 330 wide, baseline 165, centred on the whole lockup.
- * ================================================================== */
-const neoTitle = setText(extra, 'NEO', { capHeight: 52, width: 209, x: 179, baseline: 73 });
-// "HOME LOANS" is tracked out to sit under the full width of "NEO".
+const neoTitle = setText(extra, 'NEO', { capHeight: 21, width: 88, x: 490, baseline: 53 });
 const neoSub = setText(bold, 'HOME LOANS', {
-  capHeight: 13, width: 204,
-  centreOn: (neoTitle.left + neoTitle.right) / 2, baseline: 99
+  capHeight: 6, width: 85,
+  centreOn: (neoTitle.left + neoTitle.right) / 2, baseline: 64
 });
 
-// "powered by Better" mixes weights, so it is laid out as two runs that share
-// a baseline and sit side by side, then centred as a unit.
-const poweredTargetWidth = 337;
+// "powered by Better" mixes weights, so it is laid out as two runs sharing a
+// baseline, then scaled to the measured width and centred under the NEO block.
 const poweredSize = 34;
 const poweredPath = layout(medium, 'powered by ', poweredSize, 0);
 const poweredAdvance = medium.getAdvanceWidth('powered by ', poweredSize);
@@ -193,20 +155,20 @@ betterPath.commands.forEach((c) => {
 });
 poweredPath.extend(betterPath);
 
-// Centre "powered by Better" on the whole lockup (hexagon through wordmark).
-// Scale to the measured width, then centre on the whole lockup.
+const POWERED_WIDTH = 150;
 const pb = poweredPath.getBoundingBox();
-const poweredScale = poweredTargetWidth / (pb.x2 - pb.x1);
-const poweredLeft = neoTitle.right / 2 - poweredTargetWidth / 2;
+const poweredScale = POWERED_WIDTH / (pb.x2 - pb.x1);
+const poweredLeft = 428;
 poweredPath.commands.forEach((c) => {
   for (const [px, py] of [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']]) {
     if (c[px] !== undefined) {
       c[px] = (c[px] - pb.x1) * poweredScale + poweredLeft;
-      c[py] = c[py] * poweredScale + 169;
+      c[py] = c[py] * poweredScale + 93;
     }
   }
 });
 
+note('GEM HOME TEAM', gemTitle);
 note('NEO', neoTitle);
 note('HOME LOANS', neoSub);
 const pbFinal = poweredPath.getBoundingBox();
@@ -215,31 +177,35 @@ note('powered by Better', {
   left: pbFinal.x1, right: pbFinal.x2
 });
 
-// Hexagon: flat top and bottom, points left and right, generously rounded.
-// 158 x 128: flat top and bottom with points left and right, corners rounded.
+// Cyan diamond, 44 across, vertically centred in the pill.
+const diamond = 'M52 28 L74 50 L52 72 L30 50 Z';
+
+// NEO hexagon, 65 x 53 at (415, 22) — the same 1.23 proportion as the
+// standalone mark, with corners rounded from the vertices.
+const HX = 415, HY = 22, HW = 65, HH = 53;
 const hex = roundedPolygon([
-  [30, 0], [128, 0],      // top edge
-  [158, 64],              // right point
-  [128, 128], [30, 128],  // bottom edge
-  [0, 64]                 // left point
-], 17);
-// Butterfly counterform: two wedges meeting at the centre, with slightly
-// concave outer edges so it reads as the mark rather than a plain bowtie.
-// Butterfly counterform: two wedges with vertical outer edges whose apexes meet
-// at the centre. Spans 58% of the hexagon's width and 49% of its height, with
-// the corners softened as in the artwork.
-const R = 5;
+  [HX + HW * 0.19, HY], [HX + HW * 0.81, HY],
+  [HX + HW, HY + HH / 2],
+  [HX + HW * 0.81, HY + HH], [HX + HW * 0.19, HY + HH],
+  [HX, HY + HH / 2]
+], 7);
+
+// Butterfly counterform: wedges with vertical outer edges meeting at the centre.
+const bw = { x1: HX + HW * 0.184, x2: HX + HW * 0.816, y1: HY + HH * 0.24, y2: HY + HH * 0.76 };
+const cx = HX + HW / 2, cy = HY + HH / 2;
 const butterfly = [
-  // left wedge
-  `M${29 + R} 31`, `Q29 31 29 ${31 + R}`, `L29 ${94 - R}`, `Q29 94 ${29 + R} 94`,
-  'L75 62.5', 'Z',
-  // right wedge
-  `M${121 - R} 31`, `Q121 31 121 ${31 + R}`, `L121 ${94 - R}`, `Q121 94 ${121 - R} 94`,
-  'L75 62.5', 'Z'
+  `M${bw.x1.toFixed(2)} ${bw.y1.toFixed(2)}`, `L${bw.x1.toFixed(2)} ${bw.y2.toFixed(2)}`,
+  `L${cx.toFixed(2)} ${cy.toFixed(2)}`, 'Z',
+  `M${bw.x2.toFixed(2)} ${bw.y1.toFixed(2)}`, `L${bw.x2.toFixed(2)} ${bw.y2.toFixed(2)}`,
+  `L${cx.toFixed(2)} ${cy.toFixed(2)}`, 'Z'
 ].join(' ');
 
-const neoWidth = Math.ceil(Math.max(neoTitle.right, pbFinal.x2) + 2);
-const neoSymbol = `    <symbol id="mark-neo" viewBox="0 0 ${neoWidth} 180">
+const lockupSymbol = `    <symbol id="mark-lockup" viewBox="0 0 640 100">
+      <rect x="1.25" y="1.25" width="637.5" height="97.5" rx="48.75"
+            fill="none" stroke="var(--brand-rule)" stroke-width="2.5"/>
+      <path fill="#2bb3e8" d="${diamond}"/>
+      <path fill="currentColor" d="${gemTitle.d}"/>
+      <line x1="392" y1="30" x2="392" y2="70" stroke="var(--brand-rule)" stroke-width="1.5"/>
       <path fill="currentColor" d="${hex}"/>
       <path style="fill:var(--brand-knockout)" d="${butterfly}"/>
       <path fill="currentColor" d="${neoTitle.d}"/>
@@ -264,7 +230,7 @@ const ehoSymbol = `    <symbol id="mark-eho" viewBox="0 0 94 73">
 
 /* ------------------------------------------------------------------ */
 
-const block = [gemSymbol, '', neoSymbol, '', ehoSymbol].join('\n');
+const block = [lockupSymbol, '', ehoSymbol].join('\n');
 const indexPath = resolve(root, 'index.html');
 let html = readFileSync(indexPath, 'utf8');
 
@@ -278,7 +244,7 @@ html = html.replace(pattern, () => `${START}\n${block}\n    ${END}`);
 
 // The outer <svg> that references each symbol must carry the same viewBox, or
 // the mark is scaled to the wrong box. Keep them in step automatically.
-const boxes = { gem: `0 0 ${gemWidth} 145`, neo: `0 0 ${neoWidth} 180`, eho: '0 0 94 73' };
+const boxes = { lockup: '0 0 640 100', eho: '0 0 94 73' };
 for (const [mark, box] of Object.entries(boxes)) {
   const re = new RegExp(`(<svg[^>]*data-mark="${mark}"[^>]*viewBox=")[^"]*(")`, 'g');
   const before = html;
