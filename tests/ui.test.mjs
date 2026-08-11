@@ -464,17 +464,19 @@ test('the configured branch NMLS is displayed', async () => {
   assert.match(link, /nmlsconsumeraccess\.org/, 'links to NMLS Consumer Access');
 });
 
-test('outstanding licensing fields are named, not just flagged', async () => {
-  const t = await text('#licensing .license-todo');
-  assert.match(t, /Still to add before this page goes public/i);
-  // Naming each gap is the point — a generic warning is easy to ignore.
-  for (const field of ['originator name', 'originator NMLS ID', 'states licensed']) {
-    assert.ok(t.includes(field), `warning should name "${field}"`);
-  }
-  // Fields already supplied must drop out of the warning.
-  for (const done of ['company legal name', 'company NMLS ID']) {
-    assert.ok(!t.includes(done), `"${done}" is configured and should not be flagged`);
-  }
+test('the originator and licensing details are disclosed', async () => {
+  const t = (await text('#licensing')).replace(/\s+/g, ' ');
+  assert.match(t, /Anthony Edrozo/, 'originator named');
+  assert.match(t, /NMLS #2829800/, 'originator NMLS ID');
+  assert.match(t, /Company NMLS #330511/, 'company NMLS ID');
+  assert.match(t, /Branch NMLS #972639/, 'branch NMLS ID');
+  assert.match(t, /Licensed in California/, 'states licensed');
+});
+
+test('the pre-publication warning clears once nothing is outstanding', async () => {
+  const todo = await page.$('#licensing .license-todo');
+  assert.equal(todo, null,
+    'every required licensing field is configured, so no warning should show');
 });
 
 test('APR is disclosed once finance charges are entered', async () => {

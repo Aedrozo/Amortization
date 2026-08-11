@@ -26,8 +26,8 @@
     quoteUrl: 'https://neohomeloans.com/start/r/130389',   // "Get my rate quote"
     contactUrl: 'https://gemteam.youcanbook.me',           // "Talk to a loan officer"
 
-    loanOfficer: '',               // e.g. 'Jane Doe, Loan Officer'
-    loanOfficerNmls: '',           // the individual originator's NMLS ID
+    loanOfficer: 'Anthony Edrozo',
+    loanOfficerNmls: '2829800',    // the individual originator's NMLS ID
     company: 'NEO Home Loans, a division of Better Mortgage Corporation',
     companyNmls: '330511',         // Better Mortgage Corporation
     branchNmls: '972639',          // Gem Home Team branch NMLS
@@ -36,7 +36,7 @@
     dba: '',                       // e.g. 'Gem Home Team is a DBA of ...'
     address: '',                   // licensed branch address
     phone: '',
-    statesLicensed: '',            // e.g. 'Licensed in AZ, CA, NV and TX.'
+    statesLicensed: 'Licensed in California.',
     stateLicenseIds: '',           // e.g. 'AZ MB-0123456 · CA DFPI 60DBO-98765'
     consumerAccessUrl: 'https://www.nmlsconsumeraccess.org/',
     extraDisclosures: ''           // any additional state-required language
