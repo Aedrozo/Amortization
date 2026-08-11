@@ -255,36 +255,64 @@ const NEO_SCALE = 200 / NEO_W;
 /**
  * Prefer real artwork over the reconstruction.
  *
- * The vector NEO half below is traced by eye from a raster reference, which has
- * a hard accuracy ceiling. Drop the genuine file in as
- * assets/img/neo-logo-navy.<svg|png> — the name the brand SVG already
- * references — and it is inlined as a data URI in place of the trace. Add
- * neo-logo-white.<svg|png> as well and the two swap by theme; with only the
- * navy one present it is used in both, which will look wrong on dark.
+ * Drop the genuine file in as assets/img/neo-logo-navy.<svg|png> — the name the
+ * brand SVG already references — and it is inlined as a data URI in place of
+ * the trace.
+ *
+ * Two wrinkles handled here:
+ *
+ *  - An SVG that is merely a wrapper around an external bitmap is skipped.
+ *    neo-logo-navy.svg is 318 bytes of <image href="neo-logo-navy.png">; inlined
+ *    as a data URI that relative reference cannot resolve and the mark vanishes.
+ *    Only self-contained SVGs are used.
+ *  - Bitmaps are downscaled to 1000px wide before inlining, five times the
+ *    200px box the lockup displays them in. The supplied 1956px original is
+ *    136 KB; the resample is 37 KB for no visible difference.
  */
-function realArtwork(base) {
-  for (const ext of ['svg', 'png']) {
-    const file = resolve(root, `assets/img/${base}.${ext}`);
-    if (!existsSync(file)) continue;
-    const mime = ext === 'svg' ? 'image/svg+xml' : 'image/png';
-    const data = readFileSync(file).toString('base64');
-    return `data:${mime};base64,${data}`;
+async function realArtwork(base) {
+  const svg = resolve(root, `assets/img/${base}.svg`);
+  if (existsSync(svg)) {
+    const text = readFileSync(svg, 'utf8');
+    const wrapsExternalBitmap = /<image[^>]+(?:xlink:)?href="(?!data:)/i.test(text);
+    if (!wrapsExternalBitmap) {
+      return `data:image/svg+xml;base64,${Buffer.from(text).toString('base64')}`;
+    }
+    console.log(`note: ${base}.svg only wraps an external bitmap — using the PNG instead`);
   }
-  return null;
+
+  const png = resolve(root, `assets/img/${base}.png`);
+  if (!existsSync(png)) return null;
+
+  let bytes = readFileSync(png);
+  try {
+    const { default: sharp } = await import('sharp');
+    const meta = await sharp(bytes).metadata();
+    if (meta.width > 1000) {
+      bytes = await sharp(bytes).resize({ width: 1000 })
+        .png({ compressionLevel: 9, palette: true }).toBuffer();
+    }
+  } catch {
+    // sharp unavailable — inline the original rather than failing the build.
+  }
+  return `data:image/png;base64,${bytes.toString('base64')}`;
 }
 
-const neoNavy = realArtwork('neo-logo-navy');
-const neoWhite = realArtwork('neo-logo-white');
+const neoNavy = await realArtwork('neo-logo-navy');
+const neoWhite = await realArtwork('neo-logo-white');
 
 function neoHalf(vectorGroup) {
   if (!neoNavy) return vectorGroup;
   const img = (href, cls) =>
-    `<image${cls ? ` class="${cls}"` : ''} x="536" y="30" width="200" height="91" ` +
+    `<image class="${cls}" x="536" y="30" width="200" height="91" ` +
     `preserveAspectRatio="xMidYMid meet" href="${href}"/>`;
-  report.push(`NEO half                 real artwork inlined${neoWhite ? ' (light + dark)' : ' (single)'}`);
+  const kb = (u) => Math.round((u.length * 3) / 4 / 1024);
+  report.push(`NEO half                 real artwork inlined, ${kb(neoNavy)} KB` +
+    (neoWhite ? ' + a reversed variant' : ' (reversed for dark mode by filter)'));
+  // Without a supplied reversed variant, the navy mark is monochrome on
+  // transparency, so it can be flipped to white for dark backgrounds in CSS.
   return neoWhite
     ? `${img(neoNavy, 'neo-art-light')}\n      ${img(neoWhite, 'neo-art-dark')}`
-    : img(neoNavy);
+    : img(neoNavy, 'neo-art');
 }
 
 const lockupSymbol = `    <symbol id="mark-lockup" viewBox="0 0 760 150">

@@ -179,9 +179,12 @@ svg[hidden], [hidden] { display: none !important; }
 .brand-lockup > * { flex: 0 0 auto; }
 .brand-lockup svg { display: block; height: 54px; width: auto; }
 
-/* When real NEO artwork is supplied for both themes, swap by theme. */
+/* Real NEO artwork. With both variants supplied they swap by theme; with only
+   the navy one, it is monochrome on transparency so it can be flipped to white
+   for dark backgrounds. */
 [data-theme="dark"] .neo-art-light { display: none; }
 :root:not([data-theme="dark"]) .neo-art-dark { display: none; }
+[data-theme="dark"] .neo-art { filter: brightness(0) invert(1); }
 
 .header-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 
