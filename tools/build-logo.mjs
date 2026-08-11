@@ -62,9 +62,15 @@ function layout(font, text, fontSize, letterSpacing) {
  * Position: `x` is the left edge of the ink, or pass `centreOn` to centre the
  * ink on that coordinate instead.
  */
-function setText(font, text, { capHeight, tracking = 0, x, centreOn, baseline }) {
+function setText(font, text, { capHeight, tracking = 0, width, x, centreOn, baseline }) {
   const probe = layout(font, text, 100, 0).getBoundingBox();
   const fontSize = (100 * capHeight) / (probe.y2 - probe.y1);
+
+  // When a measured target width is supplied, solve the tracking for it.
+  if (width !== undefined) {
+    const natural = layout(font, text, fontSize, 0).getBoundingBox();
+    tracking = (width - (natural.x2 - natural.x1)) / Math.max(1, text.length - 1);
+  }
 
   const path = layout(font, text, fontSize, tracking);
   const box = path.getBoundingBox();
@@ -84,6 +90,36 @@ function setText(font, text, { capHeight, tracking = 0, x, centreOn, baseline })
     left: finalBox.x1,
     right: finalBox.x2
   };
+}
+
+/**
+ * Rounded polygon: walk the vertices, cut back `r` along each adjacent edge and
+ * round the corner with a quadratic through the vertex.
+ *
+ * Hand-written curves kept swallowing the straight runs and turning the NEO
+ * hexagon into a squircle; deriving the corners from the vertices keeps the
+ * flats flat and every corner identical.
+ */
+function roundedPolygon(points, r) {
+  const n = points.length;
+  const parts = [];
+  const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const dist = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const f = (p) => `${p[0].toFixed(2)} ${p[1].toFixed(2)}`;
+
+  for (let i = 0; i < n; i++) {
+    const prev = points[(i - 1 + n) % n];
+    const cur = points[i];
+    const next = points[(i + 1) % n];
+    // Never cut back more than half an edge, or adjacent corners would overlap.
+    const inR = Math.min(r, dist(prev, cur) / 2);
+    const outR = Math.min(r, dist(cur, next) / 2);
+    const start = lerp(cur, prev, inR / dist(prev, cur));
+    const end = lerp(cur, next, outR / dist(cur, next));
+    parts.push(`${i === 0 ? 'M' : 'L'}${f(start)}`, `Q${f(cur)} ${f(end)}`);
+  }
+  parts.push('Z');
+  return parts.join(' ');
 }
 
 const report = [];
@@ -138,15 +174,16 @@ const gemSymbol = `    <symbol id="mark-gem" viewBox="0 0 ${gemWidth} 145">
  * "HOME LOANS" 200 wide, 12 cap, baseline 97;
  * "powered by Better" 330 wide, baseline 165, centred on the whole lockup.
  * ================================================================== */
-const neoTitle = setText(extra, 'NEO', { capHeight: 52, tracking: 1.5, x: 178, baseline: 84 });
+const neoTitle = setText(extra, 'NEO', { capHeight: 52, width: 209, x: 179, baseline: 73 });
 // "HOME LOANS" is tracked out to sit under the full width of "NEO".
 const neoSub = setText(bold, 'HOME LOANS', {
-  capHeight: 12, tracking: 4.0,
-  centreOn: (neoTitle.left + neoTitle.right) / 2, baseline: 105
+  capHeight: 13, width: 204,
+  centreOn: (neoTitle.left + neoTitle.right) / 2, baseline: 99
 });
 
 // "powered by Better" mixes weights, so it is laid out as two runs that share
 // a baseline and sit side by side, then centred as a unit.
+const poweredTargetWidth = 337;
 const poweredSize = 34;
 const poweredPath = layout(medium, 'powered by ', poweredSize, 0);
 const poweredAdvance = medium.getAdvanceWidth('powered by ', poweredSize);
@@ -157,14 +194,15 @@ betterPath.commands.forEach((c) => {
 poweredPath.extend(betterPath);
 
 // Centre "powered by Better" on the whole lockup (hexagon through wordmark).
+// Scale to the measured width, then centre on the whole lockup.
 const pb = poweredPath.getBoundingBox();
-const lockupCentre = neoTitle.right / 2;
-const poweredLeft = lockupCentre - (pb.x2 - pb.x1) / 2;
+const poweredScale = poweredTargetWidth / (pb.x2 - pb.x1);
+const poweredLeft = neoTitle.right / 2 - poweredTargetWidth / 2;
 poweredPath.commands.forEach((c) => {
   for (const [px, py] of [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']]) {
     if (c[px] !== undefined) {
-      c[px] += poweredLeft - pb.x1;
-      c[py] += 168;
+      c[px] = (c[px] - pb.x1) * poweredScale + poweredLeft;
+      c[py] = c[py] * poweredScale + 169;
     }
   }
 });
@@ -178,21 +216,26 @@ note('powered by Better', {
 });
 
 // Hexagon: flat top and bottom, points left and right, generously rounded.
-// 150 x 128, flat top and bottom, rounded points left and right.
-const hex = [
-  'M45 0', 'L105 0',
-  'Q118 0 124 11', 'L144 53',
-  'Q150 64 144 75', 'L124 117',
-  'Q118 128 105 128', 'L45 128',
-  'Q32 128 26 117', 'L6 75',
-  'Q0 64 6 53', 'L26 11',
-  'Q32 0 45 0', 'Z'
-].join(' ');
+// 158 x 128: flat top and bottom with points left and right, corners rounded.
+const hex = roundedPolygon([
+  [30, 0], [128, 0],      // top edge
+  [158, 64],              // right point
+  [128, 128], [30, 128],  // bottom edge
+  [0, 64]                 // left point
+], 17);
 // Butterfly counterform: two wedges meeting at the centre, with slightly
 // concave outer edges so it reads as the mark rather than a plain bowtie.
+// Butterfly counterform: two wedges with vertical outer edges whose apexes meet
+// at the centre. Spans 58% of the hexagon's width and 49% of its height, with
+// the corners softened as in the artwork.
+const R = 5;
 const butterfly = [
-  'M31 37', 'L31 91', 'L75 64', 'Z',
-  'M119 37', 'L119 91', 'L75 64', 'Z'
+  // left wedge
+  `M${29 + R} 31`, `Q29 31 29 ${31 + R}`, `L29 ${94 - R}`, `Q29 94 ${29 + R} 94`,
+  'L75 62.5', 'Z',
+  // right wedge
+  `M${121 - R} 31`, `Q121 31 121 ${31 + R}`, `L121 ${94 - R}`, `Q121 94 ${121 - R} 94`,
+  'L75 62.5', 'Z'
 ].join(' ');
 
 const neoWidth = Math.ceil(Math.max(neoTitle.right, pbFinal.x2) + 2);
