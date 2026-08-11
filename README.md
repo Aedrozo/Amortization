@@ -269,9 +269,22 @@ follows the surface behind it, and the pill outline and divider track the border
 The badge's interior is transparent rather than white, so it sits correctly on any
 background.
 
-If you have the original vector files, they will always beat a reconstruction — replace
-the `<use href="#mark-gem">` elements with an `<img>` pointing at them, and supply a
-light and a dark variant since the automatic inversion no longer applies.
+#### Dropping in the real NEO artwork
+
+The NEO half is traced by eye from a raster reference, which has a hard accuracy ceiling.
+To use the genuine artwork instead, put the file here:
+
+```
+assets/img/neo-logo-navy.svg      (or .png)
+assets/img/neo-logo-white.svg     (optional — used on dark backgrounds)
+```
+
+`npm run build:logo` picks it up automatically, inlines it as a data URI in place of the
+trace, and swaps the two variants by theme. That filename is the one the brand SVG already
+references, so it should exist alongside it in whatever export folder that came from. With
+only the navy version present it is used on both themes, which will look wrong on dark.
+
+The same applies to the Gem Home Team half if a vector of it turns up.
 
 ### Colours
 All brand colour lives in the `:root` token block at the top of `assets/css/styles.css`.

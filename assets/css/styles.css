@@ -179,6 +179,10 @@ svg[hidden], [hidden] { display: none !important; }
 .brand-lockup > * { flex: 0 0 auto; }
 .brand-lockup svg { display: block; height: 54px; width: auto; }
 
+/* When real NEO artwork is supplied for both themes, swap by theme. */
+[data-theme="dark"] .neo-art-light { display: none; }
+:root:not([data-theme="dark"]) .neo-art-dark { display: none; }
+
 .header-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 
 .icon-btn {

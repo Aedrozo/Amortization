@@ -15,7 +15,7 @@
  * Rewrites the block between LOGO:START / LOGO:END in index.html.
  */
 import opentype from 'opentype.js';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -176,11 +176,26 @@ const house = 'M8 78 L48 48 L88 78 Z ' +
   'M17.5 78 H78.5 V111 A7 7 0 0 1 71.5 118 H24.5 A7 7 0 0 1 17.5 111 Z';
 const diamond = 'M48 82.4 L58.6 93 L48 103.6 L37.4 93 Z';
 
-/* ---- NEO half: vectors in a 530 x 240 space, scaled into 200 x 91 ---- */
-const NEO_RIGHT = 530;
-const neoTitle = setText(extra, 'NEO', { capHeight: 80, width: 330, x: 200, baseline: 97 });
+/* ---- NEO half -----------------------------------------------------------
+ * Re-measured from the high-resolution NEO logo. Its hexagon is 772 x 627,
+ * i.e. distinctly wider than tall (1.23); an earlier pass read it off the small
+ * combined lockup and made it nearly square, which is what looked wrong.
+ *
+ * That file also settles the alignment: "HOME LOANS" is centred on "NEO"
+ * (centres 1402 against 1400), and "powered by Better" is centred on the whole
+ * lockup (967 against 964) — neither is flush right.
+ *
+ * Built at hexagon height 146, then scaled into the 200 x 91 box the brand SVG
+ * reserves for this half.
+ * ---------------------------------------------------------------------- */
+const HEX_W = 180, HEX_H = 146;
+const NEO_W = 441;
+
+const neoTitle = setText(extra, 'NEO',
+  { capHeight: 59.4, width: 238, x: 203, baseline: 83 });
 const neoSub = setText(bold, 'HOME LOANS', {
-  capHeight: 18, width: 275, x: NEO_RIGHT - 275, baseline: 130
+  capHeight: 15, width: 232,
+  centreOn: (neoTitle.left + neoTitle.right) / 2, baseline: 113
 });
 
 const poweredSize = 34;
@@ -192,28 +207,83 @@ betterPath.commands.forEach((c) => {
 });
 poweredPath.extend(betterPath);
 
-const POWERED_WIDTH = 475;
+const POWERED_WIDTH = 383;
 const pb = poweredPath.getBoundingBox();
 const poweredScale = POWERED_WIDTH / (pb.x2 - pb.x1);
 poweredPath.commands.forEach((c) => {
   for (const [px, py] of [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']]) {
     if (c[px] !== undefined) {
-      c[px] = (c[px] - pb.x1) * poweredScale + (NEO_RIGHT - POWERED_WIDTH);
-      c[py] = c[py] * poweredScale + 222;
+      c[px] = (c[px] - pb.x1) * poweredScale + (NEO_W - POWERED_WIDTH) / 2;
+      c[py] = c[py] * poweredScale + 192;
     }
   }
 });
 
 note('NEO', neoTitle);
 note('HOME LOANS', neoSub);
+const pbFinal = poweredPath.getBoundingBox();
+note('powered by Better', {
+  width: pbFinal.x2 - pbFinal.x1, cap: pbFinal.y2 - pbFinal.y1,
+  left: pbFinal.x1, right: pbFinal.x2
+});
 
+// Corner radius ~8% of the width. A larger radius cut the left and right points
+// right back, which made the counterform look as though it filled the shape.
 const hex = roundedPolygon([
-  [34, 0], [146, 0], [180, 86], [146, 172], [34, 172], [0, 86]
-], 23);
-const butterfly = 'M38 42 L38 130 L90 86 Z M142 42 L142 130 L90 86 Z';
+  [HEX_W * 0.19, 0], [HEX_W * 0.81, 0],
+  [HEX_W, HEX_H / 2],
+  [HEX_W * 0.81, HEX_H], [HEX_W * 0.19, HEX_H],
+  [0, HEX_H / 2]
+], HEX_W * 0.08);
 
-// The file reserves x=536, y=30, 200 x 91 for the NEO artwork.
-const NEO_SCALE = 200 / NEO_RIGHT;
+// Counterform: 58% of the hexagon's width, 49% of its height, wedges meeting
+// at the centre.
+const bx1 = HEX_W * 0.18, bx2 = HEX_W * 0.775;
+const by1 = HEX_H * 0.235, by2 = HEX_H * 0.735;
+const bcx = HEX_W / 2, bcy = HEX_H / 2;
+const f2 = (n) => n.toFixed(2);
+const butterfly = [
+  `M${f2(bx1)} ${f2(by1)}`, `L${f2(bx1)} ${f2(by2)}`, `L${f2(bcx)} ${f2(bcy)}`, 'Z',
+  `M${f2(bx2)} ${f2(by1)}`, `L${f2(bx2)} ${f2(by2)}`, `L${f2(bcx)} ${f2(bcy)}`, 'Z'
+].join(' ');
+
+// The brand SVG reserves x=536, y=30, 200 x 91 for the NEO artwork.
+const NEO_SCALE = 200 / NEO_W;
+
+/**
+ * Prefer real artwork over the reconstruction.
+ *
+ * The vector NEO half below is traced by eye from a raster reference, which has
+ * a hard accuracy ceiling. Drop the genuine file in as
+ * assets/img/neo-logo-navy.<svg|png> — the name the brand SVG already
+ * references — and it is inlined as a data URI in place of the trace. Add
+ * neo-logo-white.<svg|png> as well and the two swap by theme; with only the
+ * navy one present it is used in both, which will look wrong on dark.
+ */
+function realArtwork(base) {
+  for (const ext of ['svg', 'png']) {
+    const file = resolve(root, `assets/img/${base}.${ext}`);
+    if (!existsSync(file)) continue;
+    const mime = ext === 'svg' ? 'image/svg+xml' : 'image/png';
+    const data = readFileSync(file).toString('base64');
+    return `data:${mime};base64,${data}`;
+  }
+  return null;
+}
+
+const neoNavy = realArtwork('neo-logo-navy');
+const neoWhite = realArtwork('neo-logo-white');
+
+function neoHalf(vectorGroup) {
+  if (!neoNavy) return vectorGroup;
+  const img = (href, cls) =>
+    `<image${cls ? ` class="${cls}"` : ''} x="536" y="30" width="200" height="91" ` +
+    `preserveAspectRatio="xMidYMid meet" href="${href}"/>`;
+  report.push(`NEO half                 real artwork inlined${neoWhite ? ' (light + dark)' : ' (single)'}`);
+  return neoWhite
+    ? `${img(neoNavy, 'neo-art-light')}\n      ${img(neoWhite, 'neo-art-dark')}`
+    : img(neoNavy);
+}
 
 const lockupSymbol = `    <symbol id="mark-lockup" viewBox="0 0 760 150">
       <path fill="currentColor" d="${house}"/>
@@ -224,13 +294,13 @@ const lockupSymbol = `    <symbol id="mark-lockup" viewBox="0 0 760 150">
         <line x1="500" y1="76" x2="513" y2="89"/>
         <line x1="513" y1="76" x2="500" y2="89"/>
       </g>
-      <g transform="translate(536 30) scale(${NEO_SCALE.toFixed(5)})">
+      ${neoHalf(`<g transform="translate(536 30) scale(${NEO_SCALE.toFixed(5)})">
         <path fill="currentColor" d="${hex}"/>
         <path style="fill:var(--brand-knockout)" d="${butterfly}"/>
         <path fill="currentColor" d="${neoTitle.d}"/>
         <path fill="currentColor" d="${neoSub.d}"/>
         <path fill="currentColor" d="${poweredPath.toPathData(2)}"/>
-      </g>
+      </g>`)}
     </symbol>`;
 
 /* ==================================================================
