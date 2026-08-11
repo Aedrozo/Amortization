@@ -770,6 +770,101 @@ test('the NEO mark is legible in both themes', async () => {
   await page.waitForTimeout(400);
 });
 
+test('the controls column scrolls independently of the results', async () => {
+  const p2 = await browser.newPage({ viewport: { width: 1440, height: 800 } });
+  await p2.goto(BASE, { waitUntil: 'networkidle' });
+  await p2.waitForTimeout(400);
+  await p2.click('#tab-refi');
+  await p2.waitForTimeout(400);
+  // Charts settle asynchronously and grow the document, so a scroll issued too
+  // early lands short and Chromium re-applies it later — wait for it to stick,
+  // or that deferred jump reads as the page drifting on its own.
+  await p2.evaluate(() => window.scrollTo(0, 700));
+  await p2.waitForFunction(() => Math.round(window.scrollY) === 700,
+    null, { polling: 150, timeout: 8000 });
+  await p2.waitForTimeout(400);
+
+  const col = '#panel-refi .sticky-col';
+  const geo = await p2.evaluate((s) => {
+    const c = document.querySelector(s);
+    const r = c.getBoundingClientRect();
+    return { fitsWindow: r.bottom <= window.innerHeight + 1, top: r.top,
+             scrollable: c.scrollHeight > c.clientHeight + 1 };
+  }, col);
+  assert.ok(geo.fitsWindow, 'the column never runs past the bottom of the window');
+  assert.ok(geo.scrollable, 'a long form gives the column its own scrollbar');
+
+  // Scrolling the column must leave the page — and therefore the results — put.
+  const before = await p2.evaluate(() => Math.round(window.scrollY));
+  await p2.evaluate((s) => { document.querySelector(s).scrollTop = 99999; }, col);
+  await p2.waitForTimeout(250);
+  const after = await p2.evaluate((s) => ({
+    page: Math.round(window.scrollY),
+    colScroll: Math.round(document.querySelector(s).scrollTop)
+  }), col);
+  assert.ok(after.colScroll > 0, 'the column scrolled');
+  assert.equal(after.page, before, 'the page did not move with it');
+
+  // At its end, a further wheel over the column must not chain to the page.
+  await p2.mouse.move(300, 400);
+  await p2.mouse.wheel(0, 600);
+  await p2.waitForTimeout(300);
+  assert.equal(await p2.evaluate(() => Math.round(window.scrollY)), before,
+    'scrolling past the end of the column does not drag the page along');
+
+  // A tip inside the scroll container must not be clipped by it. The column is
+  // scrolled to its end, so pick a button that is actually on screen and hover
+  // it for real — a synthetic event would not trigger :hover.
+  const spot = await p2.evaluate((s) => {
+    const c = document.querySelector(s);
+    const cr = c.getBoundingClientRect();
+    const b = [...c.querySelectorAll('.info')].find((x) => {
+      const r = x.getBoundingClientRect();
+      return x.offsetParent !== null && r.top > cr.top + 2 && r.bottom < cr.bottom - 2;
+    });
+    if (!b) return null;
+    b.id = 'tipProbe';
+    const r = b.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }, col);
+  assert.ok(spot, 'found an info button inside the scrolled column');
+  await p2.mouse.move(spot.x, spot.y);
+  await p2.waitForTimeout(250);
+
+  const tip = await p2.evaluate(() => {
+    const b = document.getElementById('tipProbe');
+    const cs = getComputedStyle(b, '::after');
+    const y = parseFloat(b.style.getPropertyValue('--tip-y'));
+    const h = parseFloat(cs.height) + 18;              // + vertical padding
+    const top = b.hasAttribute('data-tip-below') ? y : y - h;
+    return { display: cs.display, top, bottom: top + h, vh: window.innerHeight,
+             headerBottom: document.querySelector('.site-header').getBoundingClientRect().bottom };
+  });
+  assert.equal(tip.display, 'block', 'hovering shows the tooltip');
+  assert.ok(tip.top > tip.headerBottom, 'the tooltip clears the sticky header');
+  assert.ok(tip.bottom < tip.vh, 'the tooltip stays inside the window');
+  await p2.close();
+});
+
+test('a narrow or short window hands scrolling back to the page', async () => {
+  for (const [w, h] of [[1000, 900], [1440, 560], [390, 844]]) {
+    const p2 = await browser.newPage({
+      viewport: { width: w, height: h }, isMobile: w < 500, hasTouch: w < 500
+    });
+    await p2.goto(BASE, { waitUntil: 'networkidle' });
+    await p2.waitForTimeout(350);
+    const cs = await p2.evaluate(() => {
+      const c = document.querySelector('#panel-payment .sticky-col');
+      const s = getComputedStyle(c);
+      return { position: s.position, overflowY: s.overflowY, inlineMax: c.style.maxHeight };
+    });
+    assert.equal(cs.position, 'static', `${w}x${h}: no sticky column`);
+    assert.equal(cs.overflowY, 'visible', `${w}x${h}: nothing clipped`);
+    assert.equal(cs.inlineMax, '', `${w}x${h}: no height cap left behind`);
+    await p2.close();
+  }
+});
+
 test('every text colour meets WCAG AA contrast', async () => {
   // Runs the same check as tools/audit.mjs, on one representative width, so a
   // palette change that makes text unreadable fails here rather than shipping.

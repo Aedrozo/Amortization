@@ -1602,6 +1602,8 @@
     try { renderRefi(); } catch (e) { console.error('refi', e); }
     try { renderCompare(); } catch (e) { console.error('compare', e); }
     writeUrl();
+    // Adding a debt or revealing PMI fields changes how far the column scrolls.
+    if (typeof sizeStickyPanels === 'function') sizeStickyPanels();
   }
   var recalcSoon = debounce(recalcAll, 160);
 
@@ -2101,6 +2103,116 @@
   }
 
   /* ==================================================================
+   * Controls column — an independent scroll region
+   *
+   * CSS caps it at the window height minus the sticky header, which is right
+   * once the column has stuck. Before that it starts lower down the page, so
+   * a fixed cap would push its bottom past the fold and put the tail of the
+   * form out of reach. Size it to whatever is actually visible instead.
+   * ================================================================== */
+  /** Fade whichever edge still has content behind it, so the region reads as
+   *  scrollable even where the platform hides its scrollbar until you touch it. */
+  function updateColumnFades(col) {
+    var over = col.scrollHeight - col.clientHeight;
+    var scrolls = over > 2 && getComputedStyle(col).position === 'sticky';
+    col.classList.toggle('fade-top', scrolls && col.scrollTop > 4);
+    col.classList.toggle('fade-bottom', scrolls && col.scrollTop < over - 4);
+  }
+
+  function sizeStickyPanels() {
+    $$('.sticky-col').forEach(function (col) {
+      if (col.offsetParent === null) return;               // panel is hidden
+      if (getComputedStyle(col).position !== 'sticky') {   // narrow/short: page scrolls
+        col.style.maxHeight = '';
+        col.classList.remove('fade-top', 'fade-bottom');
+        return;
+      }
+      var top = col.getBoundingClientRect().top;
+      var room = window.innerHeight - Math.max(top, 0) - 16;
+      col.style.maxHeight = Math.max(room, 260) + 'px';
+      updateColumnFades(col);
+    });
+  }
+
+  function initStickyPanels() {
+    var queued = false;
+    function schedule() {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () { queued = false; sizeStickyPanels(); });
+    }
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    document.addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('.tab')) schedule();
+    });
+    $$('.sticky-col').forEach(function (col) {
+      col.addEventListener('scroll', function () { updateColumnFades(col); }, { passive: true });
+    });
+    sizeStickyPanels();
+  }
+
+  /* ==================================================================
+   * Tooltips — positioned in viewport coordinates
+   *
+   * The controls column is its own scroll container, so a tip anchored with
+   * position:absolute would be clipped by it. The tip is position:fixed and
+   * parked here over its button, flipping below when there is no room above.
+   * ================================================================== */
+  var activeTip = null;
+
+  function placeTip(btn) {
+    var GAP = 9;
+    var r = btn.getBoundingClientRect();
+    var vw = document.documentElement.clientWidth;
+    var head = document.querySelector('.site-header');
+    var headBottom = head ? head.getBoundingClientRect().bottom : 0;
+
+    // Seed a position first so the pseudo-element renders, then measure it.
+    btn.style.setProperty('--tip-x', Math.round(r.left + r.width / 2) + 'px');
+    btn.style.setProperty('--tip-y', Math.round(r.top - GAP) + 'px');
+
+    var cs = getComputedStyle(btn, '::after');
+    var tipW = parseFloat(cs.width) || 258;
+    var tipH = parseFloat(cs.height) || 70;
+
+    // Keep the whole tip on screen; buttons near an edge get an off-centre tip.
+    var half = tipW / 2 + 12;
+    var x = Math.min(Math.max(r.left + r.width / 2, half + 4), Math.max(half + 4, vw - half - 4));
+
+    var below = (r.top - GAP - tipH) < (headBottom + 4);
+    if (below) btn.setAttribute('data-tip-below', '');
+    else btn.removeAttribute('data-tip-below');
+
+    btn.style.setProperty('--tip-x', Math.round(x) + 'px');
+    btn.style.setProperty('--tip-y', Math.round(below ? r.bottom + GAP : r.top - GAP) + 'px');
+  }
+
+  function trackTip(btn) {
+    activeTip = btn;
+    placeTip(btn);
+  }
+
+  function initTooltips() {
+    function show(e) {
+      var btn = e.target.closest ? e.target.closest('.info') : null;
+      if (btn) trackTip(btn);
+    }
+    document.addEventListener('mouseover', show);
+    document.addEventListener('focusin', show);
+    document.addEventListener('mouseout', function (e) {
+      if (activeTip && e.target.closest && e.target.closest('.info') === activeTip) activeTip = null;
+    });
+    document.addEventListener('focusout', function (e) {
+      if (activeTip && e.target === activeTip) activeTip = null;
+    });
+    // A fixed tip does not travel with its button — re-park it on any scroll.
+    var reposition = function () { if (activeTip) placeTip(activeTip); };
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+  }
+
+  /* ==================================================================
    * Boot
    * ================================================================== */
   function init() {
@@ -2112,6 +2224,8 @@
     initInputs();
     initExports();
     initBranding();
+    initStickyPanels();
+    initTooltips();
     renderScenarioInputs();
     renderOneTimeList();
     renderDebtList();
