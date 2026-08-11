@@ -250,7 +250,23 @@ const butterfly = [
 ].join(' ');
 
 // The brand SVG reserves x=536, y=30, 200 x 91 for the NEO artwork.
-const NEO_SCALE = 200 / NEO_W;
+const NEO_BOX = { x: 536, y: 30, w: 200, h: 91 };
+const NEO_SCALE = NEO_BOX.w / NEO_W;
+
+/*
+ * Centre the cross in the gap between the two halves, rather than at the fixed
+ * x=500 the brand SVG uses. The Gem half's ink ends at the wordmark's right
+ * edge, so the true midpoint sits left of 500 and the cross was reading as
+ * off-centre. Vertically it is centred on the union of both halves.
+ */
+const HOUSE = { left: 8, right: 88, top: 48, bottom: 118 };
+const gemRight = Math.max(gemTitle.right, gemSub.right, HOUSE.right);
+const crossX = (gemRight + NEO_BOX.x) / 2;
+const crossY = (Math.min(HOUSE.top, NEO_BOX.y) + Math.max(HOUSE.bottom, NEO_BOX.y + NEO_BOX.h)) / 2;
+const CROSS = 7;  // half-arm
+
+report.push(`cross                    centred at ${crossX.toFixed(1)}, ${crossY.toFixed(1)} ` +
+  `(gap ${gemRight.toFixed(0)}..${NEO_BOX.x})`);
 
 /**
  * Prefer real artwork over the reconstruction.
@@ -303,7 +319,7 @@ const neoWhite = await realArtwork('neo-logo-white');
 function neoHalf(vectorGroup) {
   if (!neoNavy) return vectorGroup;
   const img = (href, cls) =>
-    `<image class="${cls}" x="536" y="30" width="200" height="91" ` +
+    `<image class="${cls}" x="${NEO_BOX.x}" y="${NEO_BOX.y}" width="${NEO_BOX.w}" height="${NEO_BOX.h}" ` +
     `preserveAspectRatio="xMidYMid meet" href="${href}"/>`;
   const kb = (u) => Math.round((u.length * 3) / 4 / 1024);
   report.push(`NEO half                 real artwork inlined, ${kb(neoNavy)} KB` +
@@ -320,11 +336,11 @@ const lockupSymbol = `    <symbol id="mark-lockup" viewBox="0 0 760 150">
       <path fill="${CYAN_MARK}" d="${diamond}"/>
       <path fill="currentColor" d="${gemTitle.d}"/>
       <path fill="${CYAN_TEXT}" d="${gemSub.d}"/>
-      <g stroke="${CYAN_TEXT}" stroke-width="2.6" stroke-linecap="round">
-        <line x1="500" y1="76" x2="513" y2="89"/>
-        <line x1="513" y1="76" x2="500" y2="89"/>
+      <g stroke="${CYAN_TEXT}" stroke-width="2.8" stroke-linecap="round">
+        <line x1="${(crossX - CROSS).toFixed(2)}" y1="${(crossY - CROSS).toFixed(2)}" x2="${(crossX + CROSS).toFixed(2)}" y2="${(crossY + CROSS).toFixed(2)}"/>
+        <line x1="${(crossX + CROSS).toFixed(2)}" y1="${(crossY - CROSS).toFixed(2)}" x2="${(crossX - CROSS).toFixed(2)}" y2="${(crossY + CROSS).toFixed(2)}"/>
       </g>
-      ${neoHalf(`<g transform="translate(536 30) scale(${NEO_SCALE.toFixed(5)})">
+      ${neoHalf(`<g transform="translate(${NEO_BOX.x} ${NEO_BOX.y}) scale(${NEO_SCALE.toFixed(5)})">
         <path fill="currentColor" d="${hex}"/>
         <path style="fill:var(--brand-knockout)" d="${butterfly}"/>
         <path fill="currentColor" d="${neoTitle.d}"/>
