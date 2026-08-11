@@ -106,19 +106,23 @@ const gemSub = setText(bold, 'MORTGAGE LENDING',
 note('GEM HOME TEAM', gemTitle);
 note('MORTGAGE LENDING', gemSub);
 
-// House: peak, slanted roof out to the shoulders, vertical sides, round base.
+// House: peaked roof whose eaves overhang the walls, then a narrower body with
+// a rounded base. The overhang is the detail that reads as a house rather than
+// a pentagon — an earlier pass had the roof flush with the walls.
 const house = [
-  'M57 5',            // start just left of the apex
-  'Q63.5 -1 70 5',    // the peak is very slightly blunted, not razor sharp
-  'L127 61',
-  'L127 125',
-  'Q127 143 109 143',
-  'L18 143',
-  'Q0 143 0 125',
-  'L0 61',
+  'M58 4',            // start just left of the apex
+  'Q63.5 -1 69 4',    // the peak is very slightly blunted, not razor sharp
+  'L127 69',          // down to the right eave
+  'L112 69',          // step back in to the wall line
+  'L112 129',
+  'Q112 143 98 143',  // rounded bottom right
+  'L29 143',
+  'Q15 143 15 129',   // rounded bottom left
+  'L15 69',
+  'L0 69',            // out to the left eave
   'Z'
 ].join(' ');
-const diamond = 'M63.5 79 L86 101 L63.5 123 L41 101 Z';
+const diamond = 'M63.5 87 L83 106 L63.5 125 L44 106 Z';
 
 const gemWidth = Math.ceil(Math.max(gemTitle.right, gemSub.right) + 2);
 const gemSymbol = `    <symbol id="mark-gem" viewBox="0 0 ${gemWidth} 145">
@@ -187,8 +191,8 @@ const hex = [
 // Butterfly counterform: two wedges meeting at the centre, with slightly
 // concave outer edges so it reads as the mark rather than a plain bowtie.
 const butterfly = [
-  'M40 36', 'L40 92', 'L75 64', 'Z',
-  'M110 36', 'L110 92', 'L75 64', 'Z'
+  'M31 37', 'L31 91', 'L75 64', 'Z',
+  'M119 37', 'L119 91', 'L75 64', 'Z'
 ].join(' ');
 
 const neoWidth = Math.ceil(Math.max(neoTitle.right, pbFinal.x2) + 2);
