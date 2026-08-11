@@ -20,14 +20,12 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-// Montserrat: at the artwork's cap height it reproduces the wordmark's natural
-// width almost exactly (632 against 648 measured), where Poppins came out 68
-// units narrow and needed heavy tracking to compensate — which is what made the
-// lockup read as mis-set.
-const FONTS = 'node_modules/@fontsource/montserrat/files';
+// Plus Jakarta Sans, named directly in the brand SVG. Earlier passes guessed at
+// the face by measuring widths (Poppins, then Montserrat); this is the real one.
+const FONTS = 'node_modules/@fontsource/plus-jakarta-sans/files';
 
 function loadFont(weight) {
-  const buf = readFileSync(resolve(root, `${FONTS}/montserrat-latin-${weight}-normal.woff`));
+  const buf = readFileSync(resolve(root, `${FONTS}/plus-jakarta-sans-latin-${weight}-normal.woff`));
   return opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length));
 }
 
@@ -35,9 +33,17 @@ const bold = loadFont(700);
 const extra = loadFont(800);
 const medium = loadFont(500);
 
-/** Lay out a string glyph by glyph so letter-spacing and kerning are explicit. */
+/**
+ * Lay out a string glyph by glyph so letter-spacing and kerning are explicit.
+ *
+ * charToGlyph rather than stringToGlyphs: the latter runs the font's GSUB
+ * features, and opentype.js cannot handle Plus Jakarta Sans's ccmp lookup
+ * ("lookupType: 6 - substFormat: 2 is not yet supported"). Plain Latin needs no
+ * substitution, and kerning is applied by hand below, so the direct cmap
+ * lookup loses nothing.
+ */
 function layout(font, text, fontSize, letterSpacing) {
-  const glyphs = font.stringToGlyphs(text);
+  const glyphs = Array.from(text).map((ch) => font.charToGlyph(ch));
   const path = new opentype.Path();
   let x = 0;
   glyphs.forEach((g, i) => {
@@ -62,9 +68,11 @@ function layout(font, text, fontSize, letterSpacing) {
  * Position: `x` is the left edge of the ink, or pass `centreOn` to centre the
  * ink on that coordinate instead.
  */
-function setText(font, text, { capHeight, tracking = 0, width, x, centreOn, baseline }) {
+function setText(font, text, { capHeight, fontSize: sizeOverride, tracking = 0, width, x, centreOn, baseline }) {
   const probe = layout(font, text, 100, 0).getBoundingBox();
-  const fontSize = (100 * capHeight) / (probe.y2 - probe.y1);
+  const fontSize = sizeOverride !== undefined
+    ? sizeOverride
+    : (100 * capHeight) / (probe.y2 - probe.y1);
 
   // When a measured target width is supplied, solve the tracking for it.
   if (width !== undefined) {
@@ -122,6 +130,17 @@ function roundedPolygon(points, r) {
   return parts.join(' ');
 }
 
+/** Advance width without going through stringToGlyphs, for the same reason. */
+function advanceWidth(font, text, fontSize) {
+  const glyphs = Array.from(text).map((ch) => font.charToGlyph(ch));
+  let w = 0;
+  glyphs.forEach((g, i) => {
+    if (i > 0) w += (font.getKerningValue(glyphs[i - 1], g) || 0) / font.unitsPerEm * fontSize;
+    w += (g.advanceWidth / font.unitsPerEm) * fontSize;
+  });
+  return w;
+}
+
 const report = [];
 function note(name, run) {
   report.push(`${name.padEnd(24)} width ${run.width.toFixed(1).padStart(7)}   ` +
@@ -129,63 +148,44 @@ function note(name, run) {
 }
 
 /* ==================================================================
- * Gem Home Team — house + wordmark
+ * Brand lockup, transcribed from the supplied gem-neo-collab-light.svg.
  *
- * Measured off the supplied lockup, origin at the house's top-left.
- * House 188 x 173; "GEM HOME TEAM" 875 wide at cap 65, baseline 83;
- * "MORTGAGE LENDING" 545 wide at cap 20, baseline 156, LEFT-aligned with the
- * wordmark above it (an earlier pass centred it, which it is not).
+ * That file's geometry, type sizes, tracking and colours are reproduced
+ * exactly in its own 760 x 150 space. Two departures, both deliberate:
+ *
+ *  - Its wordmarks are <text>, which renders in whatever font the viewer has.
+ *    They are outlined here so the lockup is identical everywhere.
+ *  - Its NEO half is <image href="neo-logo-navy.png">, a bitmap that was not
+ *    included. That half is drawn as vectors instead, from the high-resolution
+ *    NEO logo, scaled into the same 200 x 91 box the file reserves for it.
  * ================================================================== */
+const INK = '#0B2A38';        // brand navy
+const CYAN_MARK = '#38C1F0';  // diamond
+const CYAN_TEXT = '#1FA9DC';  // strapline and the cross
+
 const gemTitle = setText(extra, 'GEM HOME TEAM',
-  { capHeight: 65, width: 875, x: 270, baseline: 83 });
+  { fontSize: 36, tracking: 1.8, x: 112, baseline: 84 });
 const gemSub = setText(bold, 'MORTGAGE LENDING',
-  { capHeight: 20, width: 545, x: 270, baseline: 156 });
+  { fontSize: 14, tracking: 3.92, x: 112, baseline: 108 });
 
 note('GEM HOME TEAM', gemTitle);
 note('MORTGAGE LENDING', gemSub);
 
-// Peaked roof with eaves overhanging the walls, then a narrower body on a
-// rounded base. Roof spans the full 188; the walls sit 15 in from each side.
-const house = [
-  'M88 4', 'Q94 -1 100 4',   // slightly blunted apex
-  'L188 83',                 // right eave
-  'L173 83',                 // step in to the wall line
-  'L173 153',
-  'Q173 173 153 173',        // rounded bottom right
-  'L35 173',
-  'Q15 173 15 153',          // rounded bottom left
-  'L15 83',
-  'L0 83',                   // left eave
-  'Z'
-].join(' ');
-const diamond = 'M94 98 L126 130 L94 162 L62 130 Z';
+// House: roof 8..88 spanning wider than the 17.5..78.5 walls, rounded base.
+const house = 'M8 78 L48 48 L88 78 Z ' +
+  'M17.5 78 H78.5 V111 A7 7 0 0 1 71.5 118 H24.5 A7 7 0 0 1 17.5 111 Z';
+const diamond = 'M48 82.4 L58.6 93 L48 103.6 L37.4 93 Z';
 
-const gemWidth = Math.ceil(Math.max(gemTitle.right, gemSub.right) + 2);
-const gemSymbol = `    <symbol id="mark-gem" viewBox="0 0 ${gemWidth} 175">
-      <path fill="currentColor" d="${house}"/>
-      <path fill="#2bb3e8" d="${diamond}"/>
-      <path fill="currentColor" d="${gemTitle.d}"/>
-      <path fill="#2bb3e8" d="${gemSub.d}"/>
-    </symbol>`;
-
-/* ==================================================================
- * NEO Home Loans — hexagon + wordmark
- *
- * Origin at the hexagon's top-left. Hexagon 180 x 172; "NEO" 330 wide at
- * cap 80; "HOME LOANS" 275 wide at cap 18; "powered by Better" 475 wide.
- * The three text runs share a right edge at x = 530.
- * ================================================================== */
+/* ---- NEO half: vectors in a 530 x 240 space, scaled into 200 x 91 ---- */
 const NEO_RIGHT = 530;
 const neoTitle = setText(extra, 'NEO', { capHeight: 80, width: 330, x: 200, baseline: 97 });
 const neoSub = setText(bold, 'HOME LOANS', {
   capHeight: 18, width: 275, x: NEO_RIGHT - 275, baseline: 130
 });
 
-// "powered by Better" mixes weights: two runs sharing a baseline, scaled to the
-// measured width, then set flush with the right edge of the block above.
 const poweredSize = 34;
 const poweredPath = layout(medium, 'powered by ', poweredSize, 0);
-const poweredAdvance = medium.getAdvanceWidth('powered by ', poweredSize);
+const poweredAdvance = advanceWidth(medium, 'powered by ', poweredSize);
 const betterPath = layout(extra, 'Better', poweredSize, 0);
 betterPath.commands.forEach((c) => {
   for (const k of ['x', 'x1', 'x2']) if (c[k] !== undefined) c[k] += poweredAdvance;
@@ -206,33 +206,31 @@ poweredPath.commands.forEach((c) => {
 
 note('NEO', neoTitle);
 note('HOME LOANS', neoSub);
-const pbFinal = poweredPath.getBoundingBox();
-note('powered by Better', {
-  width: pbFinal.x2 - pbFinal.x1, cap: pbFinal.y2 - pbFinal.y1,
-  left: pbFinal.x1, right: pbFinal.x2
-});
 
-// Hexagon 180 x 172: flat top and bottom, rounded points left and right.
 const hex = roundedPolygon([
-  [34, 0], [146, 0],
-  [180, 86],
-  [146, 172], [34, 172],
-  [0, 86]
+  [34, 0], [146, 0], [180, 86], [146, 172], [34, 172], [0, 86]
 ], 23);
+const butterfly = 'M38 42 L38 130 L90 86 Z M142 42 L142 130 L90 86 Z';
 
-// Butterfly counterform: wedges with vertical outer edges meeting at the centre,
-// 58% of the hexagon's width and 49% of its height.
-const butterfly = [
-  'M38 42', 'L38 130', 'L90 86', 'Z',
-  'M142 42', 'L142 130', 'L90 86', 'Z'
-].join(' ');
+// The file reserves x=536, y=30, 200 x 91 for the NEO artwork.
+const NEO_SCALE = 200 / NEO_RIGHT;
 
-const neoSymbol = `    <symbol id="mark-neo" viewBox="0 0 ${NEO_RIGHT} 240">
-      <path fill="currentColor" d="${hex}"/>
-      <path style="fill:var(--brand-knockout)" d="${butterfly}"/>
-      <path fill="currentColor" d="${neoTitle.d}"/>
-      <path fill="currentColor" d="${neoSub.d}"/>
-      <path fill="currentColor" d="${poweredPath.toPathData(2)}"/>
+const lockupSymbol = `    <symbol id="mark-lockup" viewBox="0 0 760 150">
+      <path fill="currentColor" d="${house}"/>
+      <path fill="${CYAN_MARK}" d="${diamond}"/>
+      <path fill="currentColor" d="${gemTitle.d}"/>
+      <path fill="${CYAN_TEXT}" d="${gemSub.d}"/>
+      <g stroke="${CYAN_TEXT}" stroke-width="2.6" stroke-linecap="round">
+        <line x1="500" y1="76" x2="513" y2="89"/>
+        <line x1="513" y1="76" x2="500" y2="89"/>
+      </g>
+      <g transform="translate(536 30) scale(${NEO_SCALE.toFixed(5)})">
+        <path fill="currentColor" d="${hex}"/>
+        <path style="fill:var(--brand-knockout)" d="${butterfly}"/>
+        <path fill="currentColor" d="${neoTitle.d}"/>
+        <path fill="currentColor" d="${neoSub.d}"/>
+        <path fill="currentColor" d="${poweredPath.toPathData(2)}"/>
+      </g>
     </symbol>`;
 
 /* ==================================================================
@@ -252,7 +250,7 @@ const ehoSymbol = `    <symbol id="mark-eho" viewBox="0 0 94 73">
 
 /* ------------------------------------------------------------------ */
 
-const block = [gemSymbol, '', neoSymbol, '', ehoSymbol].join('\n');
+const block = [lockupSymbol, '', ehoSymbol].join('\n');
 const indexPath = resolve(root, 'index.html');
 let html = readFileSync(indexPath, 'utf8');
 
@@ -266,7 +264,7 @@ html = html.replace(pattern, () => `${START}\n${block}\n    ${END}`);
 
 // The outer <svg> that references each symbol must carry the same viewBox, or
 // the mark is scaled to the wrong box. Keep them in step automatically.
-const boxes = { gem: `0 0 ${gemWidth} 175`, neo: `0 0 ${NEO_RIGHT} 240`, eho: '0 0 94 73' };
+const boxes = { lockup: '0 0 760 150', eho: '0 0 94 73' };
 for (const [mark, box] of Object.entries(boxes)) {
   const re = new RegExp(`(<svg[^>]*data-mark="${mark}"[^>]*viewBox=")[^"]*(")`, 'g');
   const before = html;
