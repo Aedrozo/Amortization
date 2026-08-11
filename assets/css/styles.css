@@ -173,13 +173,13 @@ svg[hidden], [hidden] { display: none !important; }
 }
 
 .brand-lockup { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; }
-.brand-lockup svg { display: block; height: 40px; width: auto; }
+.brand-lockup svg { display: block; height: 42px; width: auto; }
 .brand-x {
   color: var(--cyan-500); font-size: 15px; font-weight: 600;
   opacity: .8; flex: 0 0 auto;
 }
 .brand-partner { display: flex; align-items: center; }
-.brand-partner svg { height: 42px; }
+.brand-partner svg { height: 50px; }
 
 .header-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 
@@ -822,7 +822,7 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
   display: flex; gap: 26px; justify-content: space-between;
   flex-wrap: wrap; align-items: flex-start;
 }
-.footer-brand svg { height: 34px; width: auto; }
+.footer-brand svg { height: 40px; width: auto; }
 .disclaimer {
   font-size: 11.5px; color: var(--text-3); line-height: 1.65; max-width: 78ch;
 }

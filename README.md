@@ -233,12 +233,34 @@ var CONFIG = {
 ```
 
 ### The logo
-The Gem Home Team and NEO lockups are **reconstructed as inline SVG** in the `<defs>`
-block at the top of `index.html` (`#mark-gem`, `#mark-neo`) so they stay sharp at any
-size and recolour themselves in dark mode. To use your official artwork instead, replace
-the `<use href="#mark-gem">` elements with an `<img>` pointing at your file — and supply a
-light-mode and dark-mode version, since the current marks invert automatically via the
-`--brand-ink` / `--brand-knockout` tokens.
+The Gem Home Team, NEO Home Loans and Equal Housing Lender marks are inline SVG in the
+`<defs>` block at the top of `index.html`, between the `LOGO:START` / `LOGO:END` markers.
+
+**The wordmarks are vector outlines, not `<text>`.** That matters: an SVG `<text>` element
+renders in whatever font the viewer happens to have installed, so the lockup came out
+mis-set on any machine without the brand typeface — which is most of them. Every glyph is
+converted to path data, so the marks look identical on every device with no webfont
+request and nothing to load.
+
+Regenerate them with:
+
+```bash
+npm run build:logo
+```
+
+`tools/build-logo.mjs` sets each run at a measured cap height and tracking taken from the
+supplied artwork, converts it to outlines with `opentype.js`, and rewrites both the
+symbols and the `viewBox` of every `<svg data-mark="…">` that references them, so the
+geometry cannot drift out of sync. `opentype.js` and the font are devDependencies used
+only at build time — the committed paths have no runtime dependency at all.
+
+The marks recolour themselves for dark mode via the `--brand-ink` and `--brand-knockout`
+tokens, so the navy becomes light and the counterform inside the NEO hexagon follows the
+surface behind it.
+
+If you have the original vector files, they will always beat a reconstruction — replace
+the `<use href="#mark-gem">` elements with an `<img>` pointing at them, and supply a
+light and a dark variant since the automatic inversion no longer applies.
 
 ### Colours
 All brand colour lives in the `:root` token block at the top of `assets/css/styles.css`.
