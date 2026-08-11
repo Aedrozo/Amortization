@@ -1614,6 +1614,15 @@
     'curBalance', 'curRate', 'curRemaining', 'newRate', 'closingCosts', 'points', 'cashOut',
     'yearsInHome', 'investReturn'];
 
+  /**
+   * Fields that must never be comma-grouped when a share link is restored.
+   * Years are years — 2026, not 2,026 — and rates/percentages/counts read as
+   * plain decimals. Everything else in URL_FIELDS is a dollar amount.
+   */
+  var PLAIN_FIELDS = ['startYear', 'origStartYear', 'interestRate', 'curRate', 'newRate',
+    'pmiRate', 'points', 'appreciation', 'escrowInflation', 'investReturn',
+    'curRemaining', 'yearsInHome', 'extraStartMonth'];
+
   function writeUrl() {
     var p = new URLSearchParams();
     URL_FIELDS.forEach(function (id) {
@@ -1652,8 +1661,7 @@
       var elx = $(id);
       if (!elx) return;
       var n = parseNum(p.get(id));
-      elx.value = /Rate|rate|points|appreciation|Inflation|Return|Remaining|yearsInHome/.test(id)
-        ? n : num0.format(n);
+      elx.value = PLAIN_FIELDS.indexOf(id) >= 0 ? n : num0.format(n);
       applied = true;
     });
     if (p.has('term')) $('loanTerm').value = p.get('term');
@@ -1865,6 +1873,17 @@
         var elx = $(id);
         if (elx) attachCurrencyFormatting(elx);
       });
+
+    // Year fields stay in year format — no thousands separator, ever.
+    ['startYear', 'origStartYear'].forEach(function (id) {
+      var elx = $(id);
+      if (!elx) return;
+      elx.addEventListener('blur', function () {
+        if (elx.value.trim() === '') return;
+        var y = Math.round(parseNum(elx.value));
+        elx.value = isFinite(y) && y > 0 ? String(y) : '';
+      });
+    });
 
     // One-time payment rows (delegated — the list is re-rendered)
     $('btnAddOneTime').addEventListener('click', function () {

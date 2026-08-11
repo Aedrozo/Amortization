@@ -396,6 +396,28 @@ test('share link round-trips the whole scenario', async () => {
   await p2.close();
 });
 
+test('the first-payment year stays in year format, never comma-grouped', async () => {
+  assert.equal(await page.inputValue('#startYear'), String(new Date().getFullYear()),
+    'the year field starts as a bare year');
+  assert.equal(await page.inputValue('#origStartYear'), String(new Date().getFullYear() - 3),
+    'the original-loan year field starts as a bare year too');
+
+  // A restored share link is where the thousands separator used to leak in.
+  const p2 = await browser.newPage();
+  await p2.goto(BASE + '#homePrice=450000&loanAmount=360000&interestRate=6.5&startYear=2026',
+    { waitUntil: 'networkidle' });
+  await p2.waitForTimeout(400);
+  assert.equal(await p2.inputValue('#startYear'), '2026',
+    'a shared link restores 2026, not 2,026');
+
+  // And typing a grouped year normalises on blur rather than sticking.
+  await p2.fill('#startYear', '2,030');
+  await p2.click('#homePrice');
+  await p2.waitForTimeout(300);
+  assert.equal(await p2.inputValue('#startYear'), '2030', 'a pasted comma is stripped on blur');
+  await p2.close();
+});
+
 test('PMI switches itself on below 20% down and reports a drop-off date', async () => {
   await page.fill('#homePrice', '450,000');
   await page.waitForTimeout(200);
