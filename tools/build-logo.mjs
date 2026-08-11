@@ -20,10 +20,14 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const FONTS = 'node_modules/@fontsource/poppins/files';
+// Montserrat: at the artwork's cap height it reproduces the wordmark's natural
+// width almost exactly (632 against 648 measured), where Poppins came out 68
+// units narrow and needed heavy tracking to compensate — which is what made the
+// lockup read as mis-set.
+const FONTS = 'node_modules/@fontsource/montserrat/files';
 
 function loadFont(weight) {
-  const buf = readFileSync(resolve(root, `${FONTS}/poppins-latin-${weight}-normal.woff`));
+  const buf = readFileSync(resolve(root, `${FONTS}/montserrat-latin-${weight}-normal.woff`));
   return opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length));
 }
 
@@ -94,10 +98,10 @@ function note(name, run) {
  * "MORTGAGE LENDING" 402 wide, 17 cap, baseline 125, centred on the wordmark.
  * ================================================================== */
 const gemTitle = setText(extra, 'GEM HOME TEAM',
-  { capHeight: 50, tracking: 1.5, x: 180, baseline: 65 });
+  { capHeight: 50, tracking: 1.25, x: 180, baseline: 65 });
 // The strapline is centred under the wordmark and widely tracked.
 const gemSub = setText(bold, 'MORTGAGE LENDING',
-  { capHeight: 16, tracking: 9.4, centreOn: (gemTitle.left + gemTitle.right) / 2, baseline: 125 });
+  { capHeight: 16, tracking: 9.0, centreOn: (gemTitle.left + gemTitle.right) / 2, baseline: 125 });
 
 note('GEM HOME TEAM', gemTitle);
 note('MORTGAGE LENDING', gemSub);
@@ -130,10 +134,10 @@ const gemSymbol = `    <symbol id="mark-gem" viewBox="0 0 ${gemWidth} 145">
  * "HOME LOANS" 200 wide, 12 cap, baseline 97;
  * "powered by Better" 330 wide, baseline 165, centred on the whole lockup.
  * ================================================================== */
-const neoTitle = setText(extra, 'NEO', { capHeight: 52, tracking: 2, x: 178, baseline: 84 });
+const neoTitle = setText(extra, 'NEO', { capHeight: 52, tracking: 1.5, x: 178, baseline: 84 });
 // "HOME LOANS" is tracked out to sit under the full width of "NEO".
 const neoSub = setText(bold, 'HOME LOANS', {
-  capHeight: 12, tracking: 4.4,
+  capHeight: 12, tracking: 4.0,
   centreOn: (neoTitle.left + neoTitle.right) / 2, baseline: 105
 });
 
@@ -183,8 +187,8 @@ const hex = [
 // Butterfly counterform: two wedges meeting at the centre, with slightly
 // concave outer edges so it reads as the mark rather than a plain bowtie.
 const butterfly = [
-  'M41 38', 'Q49 64 41 90', 'L75 64', 'Z',
-  'M109 38', 'Q101 64 109 90', 'L75 64', 'Z'
+  'M40 36', 'L40 92', 'L75 64', 'Z',
+  'M110 36', 'L110 92', 'L75 64', 'Z'
 ].join(' ');
 
 const neoWidth = Math.ceil(Math.max(neoTitle.right, pbFinal.x2) + 2);

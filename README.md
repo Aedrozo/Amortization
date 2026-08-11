@@ -254,6 +254,11 @@ symbols and the `viewBox` of every `<svg data-mark="…">` that references them,
 geometry cannot drift out of sync. `opentype.js` and the font are devDependencies used
 only at build time — the committed paths have no runtime dependency at all.
 
+The face is **Montserrat**, identified by measurement rather than by eye: at the artwork's
+cap height it reproduces the wordmark's natural width to within 1 unit (647 against 648),
+where Poppins came out 68 units narrow and needed heavy tracking to fill the same space —
+which is exactly what made the lockup read as mis-set.
+
 The marks recolour themselves for dark mode via the `--brand-ink` and `--brand-knockout`
 tokens, so the navy becomes light and the counterform inside the NEO hexagon follows the
 surface behind it.
