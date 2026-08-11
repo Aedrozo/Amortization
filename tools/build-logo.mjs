@@ -241,10 +241,12 @@ const hex = roundedPolygon([
 const bx1 = HEX_W * 0.18, bx2 = HEX_W * 0.775;
 const by1 = HEX_H * 0.235, by2 = HEX_H * 0.735;
 const bcx = HEX_W / 2, bcy = HEX_H / 2;
-const f2 = (n) => n.toFixed(2);
+// The wedges' corners are softened in the artwork rather than razor sharp, and
+// the apexes meeting at the centre are slightly blunted with them.
+const BR = HEX_W * 0.035;
 const butterfly = [
-  `M${f2(bx1)} ${f2(by1)}`, `L${f2(bx1)} ${f2(by2)}`, `L${f2(bcx)} ${f2(bcy)}`, 'Z',
-  `M${f2(bx2)} ${f2(by1)}`, `L${f2(bx2)} ${f2(by2)}`, `L${f2(bcx)} ${f2(bcy)}`, 'Z'
+  roundedPolygon([[bx1, by1], [bcx, bcy], [bx1, by2]], BR),
+  roundedPolygon([[bx2, by1], [bx2, by2], [bcx, bcy]], BR)
 ].join(' ');
 
 // The brand SVG reserves x=536, y=30, 200 x 91 for the NEO artwork.
