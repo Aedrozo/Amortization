@@ -75,6 +75,11 @@
   --brand-ink: #0B2A38;   /* exact navy from the brand SVG */
   --brand-knockout: #ffffff;
   --brand-rule: #dfe5ec;      /* the badge outline and its divider */
+  /* Which NEO artwork shows. Custom properties inherit into the shadow tree
+     <use> builds; class selectors do not reach it, so this cannot be done with
+     a class. */
+  --neo-light-vis: visible;
+  --neo-dark-vis: hidden;
 
   --maxw: 1360px;
   --header-h: 88px;
@@ -111,6 +116,8 @@
   --brand-ink: #e8f0f7;
   --brand-knockout: #0e1d2b;
   --brand-rule: #2b4a5f;
+  --neo-light-vis: hidden;
+  --neo-dark-vis: visible;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, .4);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, .45);
@@ -179,12 +186,7 @@ svg[hidden], [hidden] { display: none !important; }
 .brand-lockup > * { flex: 0 0 auto; }
 .brand-lockup svg { display: block; height: 68px; width: auto; }
 
-/* Real NEO artwork. With both variants supplied they swap by theme; with only
-   the navy one, it is monochrome on transparency so it can be flipped to white
-   for dark backgrounds. */
-[data-theme="dark"] .neo-art-light { display: none; }
-:root:not([data-theme="dark"]) .neo-art-dark { display: none; }
-[data-theme="dark"] .neo-art { filter: brightness(0) invert(1); }
+
 
 .header-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 

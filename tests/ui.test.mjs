@@ -690,6 +690,64 @@ test('removing a debt updates the totals', async () => {
   assert.equal(money(foot[1]), 36000, '14,000 + 22,000 after removing the student loan');
 });
 
+/* ------------------------------------------------------------------ */
+/* Brand marks                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Both halves of the lockup must be legible against the page in both themes.
+ *
+ * This samples rendered pixels rather than computed styles on purpose. The NEO
+ * artwork lives inside the shadow tree that <use> builds, where document CSS
+ * does not reach; a computed-style check on the template element reported the
+ * dark-mode rule as applied while the rendered mark stayed navy on navy and
+ * disappeared. Only the pixels tell the truth.
+ */
+async function markContrast(page, theme) {
+  const sharp = (await import('sharp')).default;
+  // The svg itself, not .brand-lockup — that is flex:1 and stretches well past it.
+  const shot = await page.locator('.brand-lockup svg').screenshot();
+  const { data, info } = await sharp(shot).ensureAlpha().raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const lum = (i) => 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+  const at = (x, y) => (y * info.width + x) * 4;
+  const background = lum(at(info.width - 2, 1));
+
+  // The NEO half occupies roughly 70%-97% of the lockup's width.
+  let inked = 0, total = 0;
+  for (let y = 0; y < info.height; y++) {
+    for (let x = Math.floor(info.width * 0.70); x < Math.floor(info.width * 0.97); x++) {
+      const i = at(x, y);
+      if (data[i + 3] < 8) continue;
+      total++;
+      if (Math.abs(lum(i) - background) > 40) inked++;
+    }
+  }
+  return { theme, share: total ? inked / total : 0 };
+}
+
+test('the NEO mark is legible in both themes', async () => {
+  await page.click('#tab-payment');
+  await page.waitForTimeout(300);
+
+  const light = await markContrast(page, 'light');
+  assert.ok(light.share > 0.06,
+    `NEO mark should be visible on the light theme (${(light.share * 100).toFixed(1)}% inked)`);
+
+  await page.click('#btnTheme');
+  await page.waitForTimeout(500);
+  assert.equal(await page.getAttribute('html', 'data-theme'), 'dark');
+
+  const dark = await markContrast(page, 'dark');
+  assert.ok(dark.share > 0.06,
+    `NEO mark should be visible on the dark theme too (${(dark.share * 100).toFixed(1)}% inked) — ` +
+    'a navy mark on a navy header is the failure this guards');
+
+  await page.click('#btnTheme');
+  await page.waitForTimeout(400);
+});
+
 test('no tab overflows horizontally at any viewport width', async () => {
   // A stray horizontal scrollbar is the classic mobile regression; check the
   // real thing rather than trusting the media queries.

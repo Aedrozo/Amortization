@@ -314,21 +314,59 @@ async function realArtwork(base) {
 }
 
 const neoNavy = await realArtwork('neo-logo-navy');
-const neoWhite = await realArtwork('neo-logo-white');
+
+/**
+ * Reversed variant for dark backgrounds.
+ *
+ * Uses a supplied neo-logo-white.* when one exists. Otherwise it is derived
+ * from the navy artwork: the mark is monochrome on transparency, so recolouring
+ * every opaque pixel to the dark theme's ink while keeping the alpha channel
+ * gives an exact reverse.
+ */
+async function reversedArtwork() {
+  const supplied = await realArtwork('neo-logo-white');
+  if (supplied) return { uri: supplied, derived: false };
+  if (!neoNavy || !neoNavy.startsWith('data:image/png')) return null;
+  try {
+    const { default: sharp } = await import('sharp');
+    const src = Buffer.from(neoNavy.split(',')[1], 'base64');
+    const { data, info } = await sharp(src).ensureAlpha().raw()
+      .toBuffer({ resolveWithObject: true });
+    const [r, g, b] = [0xe8, 0xf0, 0xf7];   // --brand-ink in the dark theme
+    for (let i = 0; i < data.length; i += 4) { data[i] = r; data[i + 1] = g; data[i + 2] = b; }
+    const out = await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
+      .png({ compressionLevel: 9, palette: true }).toBuffer();
+    return { uri: `data:image/png;base64,${out.toString('base64')}`, derived: true };
+  } catch {
+    return null;
+  }
+}
+const neoReversed = await reversedArtwork();
 
 function neoHalf(vectorGroup) {
   if (!neoNavy) return vectorGroup;
-  const img = (href, cls) =>
-    `<image class="${cls}" x="${NEO_BOX.x}" y="${NEO_BOX.y}" width="${NEO_BOX.w}" height="${NEO_BOX.h}" ` +
+  /*
+   * Theme switching via an inherited custom property in a style attribute, not
+   * a class. CSS selectors in the document do not reach inside the shadow tree
+   * <use> builds — Chromium happens to apply a filter there, Safari does not,
+   * which left the navy mark invisible on the dark theme. Custom properties DO
+   * inherit across that boundary, which is why --brand-knockout has always
+   * worked, so visibility is driven the same way.
+   */
+  const img = (href, vis) =>
+    `<image style="visibility:var(${vis})" x="${NEO_BOX.x}" y="${NEO_BOX.y}" ` +
+    `width="${NEO_BOX.w}" height="${NEO_BOX.h}" ` +
     `preserveAspectRatio="xMidYMid meet" href="${href}"/>`;
   const kb = (u) => Math.round((u.length * 3) / 4 / 1024);
-  report.push(`NEO half                 real artwork inlined, ${kb(neoNavy)} KB` +
-    (neoWhite ? ' + a reversed variant' : ' (reversed for dark mode by filter)'));
-  // Without a supplied reversed variant, the navy mark is monochrome on
-  // transparency, so it can be flipped to white for dark backgrounds in CSS.
-  return neoWhite
-    ? `${img(neoNavy, 'neo-art-light')}\n      ${img(neoWhite, 'neo-art-dark')}`
-    : img(neoNavy, 'neo-art');
+
+  if (!neoReversed) {
+    report.push(`NEO half                 real artwork inlined, ${kb(neoNavy)} KB (light only)`);
+    return `<image x="${NEO_BOX.x}" y="${NEO_BOX.y}" width="${NEO_BOX.w}" height="${NEO_BOX.h}" ` +
+      `preserveAspectRatio="xMidYMid meet" href="${neoNavy}"/>`;
+  }
+  report.push(`NEO half                 real artwork inlined, ${kb(neoNavy)} KB + ` +
+    `${kb(neoReversed.uri)} KB reversed` + (neoReversed.derived ? ' (derived)' : ' (supplied)'));
+  return `${img(neoNavy, '--neo-light-vis')}\n      ${img(neoReversed.uri, '--neo-dark-vis')}`;
 }
 
 const lockupSymbol = `    <symbol id="mark-lockup" viewBox="0 0 760 150">
