@@ -1458,7 +1458,10 @@
     $('compareTableWrap').innerHTML =
       '<table class="data"><thead><tr><th></th>' +
       scenarios.map(function (sc, i) {
-        return '<th style="color:' + scenarioColors()[i] + '">' + esc(sc.name) + '</th>';
+        // A swatch carries the series colour; the label stays in body text so it
+        // stays readable. Chart fills are far too light to use as 11px type.
+        return '<th><span class="th-swatch" style="background:' + scenarioColors()[i] + '"></span>' +
+          esc(sc.name) + '</th>';
       }).join('') + '</tr></thead><tbody>' +
       metrics.map(function (m) {
         return '<tr><td><strong>' + m[0] + '</strong></td>' +

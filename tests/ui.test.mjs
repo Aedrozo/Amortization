@@ -748,6 +748,19 @@ test('the NEO mark is legible in both themes', async () => {
   await page.waitForTimeout(400);
 });
 
+test('every text colour meets WCAG AA contrast', async () => {
+  // Runs the same check as tools/audit.mjs, on one representative width, so a
+  // palette change that makes text unreadable fails here rather than shipping.
+  const { execFileSync } = await import('node:child_process');
+  const out = execFileSync('node', ['tools/audit.mjs'], {
+    encoding: 'utf8', env: { ...process.env, BASE_URL: BASE }, timeout: 600000
+  });
+  const failures = Number((out.match(/CONTRAST \(WCAG AA\)\s+—\s+(\d+)/) || [, '?'])[1]);
+  const clipped = Number((out.match(/CLIPPED TEXT\s+—\s+(\d+)/) || [, '?'])[1]);
+  assert.equal(failures, 0, `contrast failures:\n${out.split('CLIPPED TEXT')[0]}`);
+  assert.equal(clipped, 0, 'text clipped by its own box');
+});
+
 test('no tab overflows horizontally at any viewport width', async () => {
   // A stray horizontal scrollbar is the classic mobile regression; check the
   // real thing rather than trusting the media queries.

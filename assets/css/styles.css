@@ -13,7 +13,7 @@
   --navy-700: #0e3349;
   --navy-600: #14415c;
   --navy-500: #1d5b7d;
-  --cyan-600: #1391c9;
+  --cyan-600: #0f75a3;    /* text/links: 4.5:1 on --green-100, 5.1:1 on white */
   --cyan-500: #2bb3e8;
   --cyan-400: #55c6f2;
   --cyan-300: #8adcf8;
@@ -21,12 +21,14 @@
   --cyan-50:  #eef9fe;
 
   /* Semantic accents */
-  --green-600: #0f9d76;
+  --green-600: #0c7c5d;   /* text: 4.6:1 on --green-100 */
   --green-500: #16b98c;
   --green-100: #dcf7ee;
-  --amber-500: #f0a132;
+  --amber-500: #f0a132;   /* fills and charts */
+  --amber-600: #95641f;   /* text: 4.5:1 on --amber-100 */
   --amber-100: #fdf0dc;
-  --red-500:   #e2564d;
+  --red-500:   #e2564d;   /* fills and charts */
+  --red-600:   #b7463e;   /* text: 4.5:1 on --red-100 */
   --red-100:   #fde8e6;
   --violet-500:#7c6cf0;
   --slate-500: #64748b;
@@ -43,7 +45,7 @@
   /* Text */
   --text:       #0d2233;
   --text-2:     #48607a;
-  --text-3:     #7d90a4;
+  --text-3:     #606f7e;  /* 4.6:1 on the tinted panels, 5.2:1 on white */
   --text-inv:   #ffffff;
 
   /* Chart palette */
@@ -102,13 +104,19 @@
 
   --text:    #e8f0f7;
   --text-2:  #9db2c6;
-  --text-3:  #6c8399;
 
   --cyan-100: #123449;
   --cyan-50:  #0d2839;
   --green-100:#0d3329;
   --amber-100:#3a2c15;
   --red-100:  #3a1e1c;
+
+  /* Text roles invert: the light theme's darkened values would vanish here. */
+  --text-3:     #90a3b4;  /* clears 4.5:1 on the tinted panels too */
+  --green-600:  #16b98c;
+  --cyan-600:   #2bb3e8;
+  --red-600:    #e56a62;
+  --amber-600:  #f0a132;
 
   --c-interest: #4d7695;
   --c-balance:  #7ba3c2;
@@ -286,6 +294,9 @@ svg[hidden], [hidden] { display: none !important; }
   box-shadow: var(--shadow-sm);
 }
 .card + .card { margin-top: 18px; }
+/* ...but not when cards are grid items: the gap already spaces them, and the
+   adjacent-sibling margin pushed every card except the first one down. */
+.scenario-grid > .card + .card { margin-top: 0; }
 .card-head {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 17px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap;
@@ -365,7 +376,7 @@ select {
 .field-split { display: grid; grid-template-columns: 1.35fr 1fr; gap: 11px; }
 
 .hint { font-size: 12px; color: var(--text-3); margin-top: 5px; line-height: 1.45; }
-.error-text { font-size: 12.5px; color: var(--red-500); margin-top: 5px; font-weight: 600; }
+.error-text { font-size: 12.5px; color: var(--red-600); margin-top: 5px; font-weight: 600; }
 
 /* Range slider */
 .range-row { display: flex; align-items: center; gap: 12px; margin-top: 9px; }
@@ -430,7 +441,7 @@ input[type="range"]:focus { box-shadow: none; }
 .info {
   display: inline-flex; align-items: center; justify-content: center;
   width: 15px; height: 15px; border-radius: 50%; flex: 0 0 auto;
-  background: var(--border); color: var(--text-3);
+  background: var(--border); color: var(--text-2);
   font-size: 10px; font-weight: 800; cursor: help;
   position: relative; border: 0; padding: 0;
 }
@@ -524,9 +535,9 @@ input[type="range"]:focus { box-shadow: none; }
 .stat.is-good .stat-value { color: var(--green-600); }
 .stat.is-good .stat-label { color: color-mix(in srgb, var(--green-600) 78%, var(--text-2)); }
 .stat.is-warn { background: var(--amber-100); border-color: transparent; }
-.stat.is-warn .stat-value { color: var(--amber-500); }
+.stat.is-warn .stat-value { color: var(--amber-600); }
 .stat.is-bad  { background: var(--red-100); border-color: transparent; }
-.stat.is-bad  .stat-value { color: var(--red-500); }
+.stat.is-bad  .stat-value { color: var(--red-600); }
 .stat.is-hero {
   background: linear-gradient(135deg, var(--navy-800), var(--navy-700));
   border-color: transparent; color: #fff;
@@ -638,6 +649,12 @@ table.data thead th {
   border-bottom: 1px solid var(--border);
 }
 table.data tbody td { border-bottom: 1px solid var(--border); }
+/* Series swatch in a column header — the colour identifies the series without
+   being asked to work as small text. */
+.th-swatch {
+  display: inline-block; width: 9px; height: 9px; border-radius: 2px;
+  margin-right: 6px; vertical-align: baseline;
+}
 table.data tbody tr:hover td { background: var(--surface-2); }
 table.data tbody tr.is-year-start td { border-top: 1.5px solid var(--border-2); }
 table.data tbody tr.is-payoff td {
@@ -717,7 +734,7 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
   font-size: 11.5px; font-weight: 700;
 }
 .delta-pill.up   { background: var(--green-100); color: var(--green-600); }
-.delta-pill.down { background: var(--red-100); color: var(--red-500); }
+.delta-pill.down { background: var(--red-100); color: var(--red-600); }
 .delta-pill.flat { background: var(--surface-3); color: var(--text-3); }
 
 /* ==================================================================
@@ -732,10 +749,10 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
 .callout strong { font-weight: 700; }
 .callout.is-info    { background: var(--cyan-50); color: var(--navy-700); border-color: color-mix(in srgb, var(--cyan-500) 22%, transparent); }
 .callout.is-good    { background: var(--green-100); color: var(--green-600); }
-.callout.is-warn    { background: var(--amber-100); color: color-mix(in srgb, var(--amber-500) 82%, #000); }
-.callout.is-bad     { background: var(--red-100); color: var(--red-500); }
+.callout.is-warn    { background: var(--amber-100); color: var(--amber-600); }
+.callout.is-bad     { background: var(--red-100); color: var(--red-600); }
 [data-theme="dark"] .callout.is-info { color: var(--cyan-300); }
-[data-theme="dark"] .callout.is-warn { color: var(--amber-500); }
+[data-theme="dark"] .callout.is-warn { color: var(--amber-600); }
 
 .verdict {
   display: flex; align-items: center; gap: 16px; padding: 20px;
@@ -755,7 +772,7 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
 .verdict.is-warn .verdict-badge { background: var(--amber-500); color: #fff; }
 .verdict.is-bad { background: var(--red-100); }
 .verdict.is-bad .verdict-badge { background: var(--red-500); color: #fff; }
-.verdict.is-bad .verdict-title { color: var(--red-500); }
+.verdict.is-bad .verdict-title { color: var(--red-600); }
 
 /* ==================================================================
    14. Milestones / timeline
@@ -843,7 +860,7 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
 .licensing strong { color: var(--text); }
 .licensing a { color: var(--cyan-600); }
 .license-todo {
-  display: block; color: var(--amber-500); font-weight: 650; margin-bottom: 6px;
+  display: block; color: var(--amber-600); font-weight: 650; margin-bottom: 6px;
 }
 .license-todo code {
   font-family: var(--font-num); font-size: 11px;
@@ -862,7 +879,7 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
 }
 .eho-text a { color: var(--cyan-600); text-decoration: none; }
 .eho-text a:hover { text-decoration: underline; }
-.eho-sep { color: var(--border-2); margin: 0 9px; }
+.eho-sep { color: var(--text-3); margin: 0 9px; }
 .eho-logo {
   width: 62px; height: 45px; flex: 0 0 auto; color: var(--text-2);
 }
@@ -885,7 +902,7 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
 .mt-24 { margin-top: 24px; }
 .mb-0  { margin-bottom: 0 !important; }
 .text-good { color: var(--green-600); }
-.text-bad  { color: var(--red-500); }
+.text-bad  { color: var(--red-600); }
 .text-muted { color: var(--text-3); }
 .num { font-variant-numeric: tabular-nums; }
 .nowrap { white-space: nowrap; }
@@ -962,7 +979,7 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
   font-size: 13px; font-weight: 750; margin-top: 5px; font-variant-numeric: tabular-nums;
 }
 .outlay-delta.up { color: var(--green-600); }
-.outlay-delta.down { color: var(--red-500); }
+.outlay-delta.down { color: var(--red-600); }
 .outlay-delta.flat { color: var(--text-3); font-weight: 600; }
 .outlay-col.is-highlight .outlay-delta.up { color: var(--green-500); }
 .outlay-sub {
