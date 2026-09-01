@@ -1478,7 +1478,7 @@
   /* ==================================================================
    * CSV export
    * ================================================================== */
-  function download(filename, text) {
+  function anchorDownload(filename, text) {
     var blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -1486,6 +1486,27 @@
     document.body.appendChild(a); a.click();
     document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  /**
+   * Save a generated CSV. Inside the claude.ai artifact viewer the sandbox
+   * blocks anchor downloads, so the page asks the platform to offer the file
+   * (the viewer confirms the save). Everywhere else — GitHub Pages, a local
+   * copy — window.claude doesn't exist and the plain anchor path runs.
+   */
+  function download(filename, text) {
+    if (window.claude && typeof window.claude.use === 'function') {
+      window.claude.use('downloads').then(function (dl) {
+        if (!dl) { anchorDownload(filename, text); return; }
+        dl.save({ filename: filename, data: text }).catch(function (err) {
+          // The viewer said no, or a prompt is already open — respect that.
+          if (err && (err.code === 'declined' || err.code === 'rate_limited')) return;
+          anchorDownload(filename, text);
+        });
+      }, function () { anchorDownload(filename, text); });
+      return;
+    }
+    anchorDownload(filename, text);
   }
 
   function csvCell(v) {
