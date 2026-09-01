@@ -81,7 +81,7 @@
 <section class="hero">
   <div class="wrap">
     <h1 class="hero-title">Know your loan <span class="accent">to the penny.</span></h1>
-    <p class="hero-sub">A complete amortization, payoff and refinance toolkit — every payment, every dollar
+    <p class="hero-sub">A complete home-financing toolkit — amortization, payoff, refinance, buy-vs-rent and more: every payment, every dollar
       of interest, and exactly what you save by paying a little extra. Nothing is sent anywhere; every
       calculation runs right in your browser.</p>
 
@@ -101,6 +101,18 @@
       <button class="tab" role="tab" id="tab-refi" aria-controls="panel-refi" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0114.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0020.5 15"/></svg>
         Refinance
+      </button>
+      <button class="tab" role="tab" id="tab-buyrent" aria-controls="panel-buyrent" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/></svg>
+        Buy vs Rent
+      </button>
+      <button class="tab" role="tab" id="tab-wait" aria-controls="panel-wait" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Buy Now vs Wait
+      </button>
+      <button class="tab" role="tab" id="tab-strategy" aria-controls="panel-strategy" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+        Rate Strategies
       </button>
       <button class="tab" role="tab" id="tab-compare" aria-controls="panel-compare" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
@@ -874,6 +886,604 @@
             </div>
           </div>
           <div id="buydownResult" class="mt-8"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================
+     TAB — Buy vs Rent
+     ============================================================= -->
+<section class="tab-panel" id="panel-buyrent" role="tabpanel" aria-labelledby="tab-buyrent" hidden>
+  <div class="layout">
+    <div class="sticky-col no-print">
+      <div class="card">
+        <div class="card-head"><h2>The home you'd buy</h2></div>
+        <div class="card-body">
+          <div class="field">
+            <label class="field-label" for="brPrice">Home price</label>
+            <div class="input-wrap">
+              <span class="affix affix-left">$</span>
+              <input type="text" inputmode="decimal" id="brPrice" class="has-affix-left" value="450,000">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="brDownPct">Down payment</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="brDownPct" class="has-affix-right" value="20">
+                <span class="affix affix-right">%</span>
+              </div>
+              <div class="hint" id="brDownHint"></div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="brRate">Interest rate</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="brRate" class="has-affix-right" value="6.5">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label" for="brTerm">Loan term</label>
+            <select id="brTerm">
+              <option value="360" selected>30 years</option>
+              <option value="240">20 years</option>
+              <option value="180">15 years</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="brBuyClose">
+                Buying costs
+                <button class="info" type="button" tabindex="0" data-tip="One-time closing costs when you buy — lender fees, title, escrow, appraisal. Typically 2–4% of the price.">i</button>
+              </label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="brBuyClose" class="has-affix-right" value="3">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="brSellClose">
+                Selling costs
+                <button class="info" type="button" tabindex="0" data-tip="Agent commissions and closing costs when you eventually sell, typically 5–7%. This is why buying starts out behind — you cannot sell on day one for what you paid plus nothing.">i</button>
+              </label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="brSellClose" class="has-affix-right" value="6">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>The cost of owning it</h2></div>
+        <div class="card-body">
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="brTaxPct">Property tax / yr</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="brTaxPct" class="has-affix-right" value="1.1">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="brInsurance">Insurance / yr</label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="brInsurance" class="has-affix-left" value="1,800">
+              </div>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="brMaint">
+                Maintenance / yr
+                <button class="info" type="button" tabindex="0" data-tip="Upkeep, repairs and replacements — the cost renters never see. The common planning figure is 1% of the home's value per year.">i</button>
+              </label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="brMaint" class="has-affix-right" value="1">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="brHoa">HOA / mo</label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="brHoa" class="has-affix-left" value="0">
+              </div>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="brPmi">
+                PMI rate
+                <button class="info" type="button" tabindex="0" data-tip="Applied automatically when the down payment is under 20%, and cancelled once the balance amortizes to 78% of the purchase price, as the Homeowners Protection Act requires.">i</button>
+              </label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="brPmi" class="has-affix-right" value="0.5">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="brAppr">
+                Appreciation / yr
+                <button class="info" type="button" tabindex="0" data-tip="How fast the home's value grows. The long-run national average is 3–4% a year; your market may differ. Property tax, insurance and maintenance scale up with the value.">i</button>
+              </label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="brAppr" class="has-affix-right" value="3">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>The rent you'd pay instead</h2></div>
+        <div class="card-body">
+          <div class="field">
+            <label class="field-label" for="brRent">Monthly rent today</label>
+            <div class="input-wrap">
+              <span class="affix affix-left">$</span>
+              <input type="text" inputmode="decimal" id="brRent" class="has-affix-left" value="2,600">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="brRentGrowth">Rent increase / yr</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="brRentGrowth" class="has-affix-right" value="3">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="brRentIns">Renter's ins / mo</label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="brRentIns" class="has-affix-left" value="15">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Your plans</h2></div>
+        <div class="card-body">
+          <div class="field">
+            <label class="field-label" for="brYears">Years you'll stay</label>
+            <input type="text" inputmode="decimal" id="brYears" value="7">
+            <div class="range-row">
+              <input type="range" id="brYearsRange" min="1" max="30" step="1" value="7" aria-label="Years you'll stay">
+            </div>
+          </div>
+          <div class="field mb-0">
+            <label class="field-label" for="brInvest">
+              If the renter invests instead
+              <button class="info" type="button" tabindex="0" data-tip="The fair comparison: the renter invests the down payment and closing costs they didn't spend — plus any month renting is cheaper — at this annual return. The S&amp;P 500's long-run average is about 7% after inflation.">i</button>
+            </label>
+            <div class="input-wrap">
+              <input type="text" inputmode="decimal" id="brInvest" class="has-affix-right" value="7">
+              <span class="affix affix-right">%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div id="brError"></div>
+      <div id="brVerdict"></div>
+      <div class="stat-grid" id="brStats"></div>
+
+      <div class="card mt-20">
+        <div class="card-head">
+          <div>
+            <h2>Which path builds more wealth?</h2>
+            <div class="sub">Net position after selling costs, month by month — buyer's equity vs. renter's portfolio</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="chart-box" id="brChart"></div>
+          <div class="legend" id="brLegend"></div>
+          <div id="brNote" class="mt-16"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>What each month costs today</h2>
+            <div class="sub">Every cost of owning, against the full cost of renting</div>
+          </div>
+        </div>
+        <div class="card-body flush">
+          <div class="table-scroll" id="brMonthlyWrap"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2 id="brHorizonTitle">Where you'd stand</h2>
+            <div class="sub">If you sold (or walked away from the lease) at that point</div>
+          </div>
+        </div>
+        <div class="card-body flush">
+          <div class="table-scroll" id="brHorizonWrap"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================
+     TAB — Buy Now vs Wait
+     ============================================================= -->
+<section class="tab-panel" id="panel-wait" role="tabpanel" aria-labelledby="tab-wait" hidden>
+  <div class="layout">
+    <div class="sticky-col no-print">
+      <div class="card">
+        <div class="card-head"><h2>The purchase</h2></div>
+        <div class="card-body">
+          <div class="field">
+            <label class="field-label" for="cwPrice">Home price today</label>
+            <div class="input-wrap">
+              <span class="affix affix-left">$</span>
+              <input type="text" inputmode="decimal" id="cwPrice" class="has-affix-left" value="450,000">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="cwDownPct">Down payment</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="cwDownPct" class="has-affix-right" value="20">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="cwTerm">Loan term</label>
+              <select id="cwTerm">
+                <option value="360" selected>30 years</option>
+                <option value="240">20 years</option>
+                <option value="180">15 years</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="cwRate">Rate today</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="cwRate" class="has-affix-right" value="6.5">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="cwRateLater">
+                Rate if you wait
+                <button class="info" type="button" tabindex="0" data-tip="Where you expect rates to be when you'd finally buy. Nobody knows — try it both ways. Even a lower future rate has to overcome the price appreciation you missed.">i</button>
+              </label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="cwRateLater" class="has-affix-right" value="6.5">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label" for="cwAppr">
+              Appreciation / yr
+              <button class="info" type="button" tabindex="0" data-tip="How fast prices in your market are rising. This drives both the higher future price and the equity a buy-now buyer collects while waiting.">i</button>
+            </label>
+            <div class="input-wrap">
+              <input type="text" inputmode="decimal" id="cwAppr" class="has-affix-right" value="4">
+              <span class="affix affix-right">%</span>
+            </div>
+          </div>
+          <div class="field mb-0">
+            <label class="field-label" for="cwWait">Years you'd wait</label>
+            <input type="text" inputmode="decimal" id="cwWait" value="2">
+            <div class="range-row">
+              <input type="range" id="cwWaitRange" min="1" max="5" step="1" value="2" aria-label="Years you would wait">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Bid over asking</h2>
+            <div class="sub">Uses the purchase assumptions above</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label class="field-label" for="boAsk">Asking price</label>
+            <div class="input-wrap">
+              <span class="affix affix-left">$</span>
+              <input type="text" inputmode="decimal" id="boAsk" class="has-affix-left" value="450,000">
+            </div>
+          </div>
+          <div class="field mb-0">
+            <label class="field-label" for="boBid">Your bid</label>
+            <div class="input-wrap">
+              <span class="affix affix-left">$</span>
+              <input type="text" inputmode="decimal" id="boBid" class="has-affix-left" value="465,000">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>What you can afford</h2>
+            <div class="sub">Standard 28 / 36 debt-to-income caps</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label class="field-label" for="afIncome">Household income / yr</label>
+            <div class="input-wrap">
+              <span class="affix affix-left">$</span>
+              <input type="text" inputmode="decimal" id="afIncome" class="has-affix-left" value="120,000">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="afDebts">
+                Other debts / mo
+                <button class="info" type="button" tabindex="0" data-tip="Minimum payments on cars, cards, student loans — everything a lender counts against the back-end ratio.">i</button>
+              </label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="afDebts" class="has-affix-left" value="500">
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="afDown">Cash for down payment</label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="afDown" class="has-affix-left" value="60,000">
+              </div>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="afTax">Property tax / yr</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="afTax" class="has-affix-right" value="1.1">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="afIns">Insurance / yr</label>
+              <div class="input-wrap">
+                <span class="affix affix-left">$</span>
+                <input type="text" inputmode="decimal" id="afIns" class="has-affix-left" value="1,800">
+              </div>
+            </div>
+          </div>
+          <div class="hint">Uses the rate and term from the purchase card. A pre-approval is the real answer — this is the planning number.</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div id="cwError"></div>
+      <div id="cwVerdict"></div>
+      <div class="stat-grid" id="cwStats"></div>
+
+      <div class="card mt-20">
+        <div class="card-head">
+          <div>
+            <h2>The equity you'd build while waiting</h2>
+            <div class="sub">Buy today, and by the time you would have started, you already own this much</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="chart-box" id="cwChart"></div>
+          <div class="legend" id="cwLegend"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Bid over asking</h2>
+            <div class="sub">How long appreciation takes to make your bid look cheap</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="stat-grid" id="boStats"></div>
+          <div class="chart-box mt-16" id="boChart"></div>
+          <div class="legend" id="boLegend"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>What you can afford</h2>
+            <div class="sub">The price where your ratios hit the standard caps</div>
+          </div>
+        </div>
+        <div class="card-body" id="afResult"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================
+     TAB — Rate Strategies
+     ============================================================= -->
+<section class="tab-panel" id="panel-strategy" role="tabpanel" aria-labelledby="tab-strategy" hidden>
+  <div class="layout">
+    <div class="sticky-col no-print">
+      <div class="card">
+        <div class="card-head"><h2>The purchase</h2></div>
+        <div class="card-body">
+          <div class="field">
+            <label class="field-label" for="stPrice">Home price</label>
+            <div class="input-wrap">
+              <span class="affix affix-left">$</span>
+              <input type="text" inputmode="decimal" id="stPrice" class="has-affix-left" value="450,000">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="stDownPct">Down payment</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="stDownPct" class="has-affix-right" value="20">
+                <span class="affix affix-right">%</span>
+              </div>
+              <div class="hint" id="stLoanHint"></div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="stTerm">Loan term</label>
+              <select id="stTerm">
+                <option value="360" selected>30 years</option>
+                <option value="240">20 years</option>
+                <option value="180">15 years</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label" for="stRate">Note rate</label>
+            <div class="input-wrap">
+              <input type="text" inputmode="decimal" id="stRate" class="has-affix-right" value="6.5">
+              <span class="affix affix-right">%</span>
+            </div>
+          </div>
+          <div class="field mb-0">
+            <label class="field-label" for="stYears">Years you'll keep the loan</label>
+            <input type="text" inputmode="decimal" id="stYears" value="7">
+            <div class="range-row">
+              <input type="range" id="stYearsRange" min="1" max="30" step="1" value="7" aria-label="Years you'll keep the loan">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Temporary buydown</h2></div>
+        <div class="card-body">
+          <div class="segmented full mb-0" role="group" aria-label="Buydown structure">
+            <button type="button" data-bdtype="321" aria-pressed="false">3-2-1</button>
+            <button type="button" data-bdtype="21" aria-pressed="true">2-1</button>
+            <button type="button" data-bdtype="10" aria-pressed="false">1-0</button>
+          </div>
+          <div class="hint">The rate steps up each year until it reaches the note rate. The subsidy is usually seller-paid.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Seller credit</h2>
+            <div class="sub">The same dollars, three different ways</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label class="field-label" for="stConcession">Credit amount</label>
+            <div class="input-wrap">
+              <span class="affix affix-left">$</span>
+              <input type="text" inputmode="decimal" id="stConcession" class="has-affix-left" value="15,000">
+            </div>
+          </div>
+          <div class="field mb-0">
+            <label class="field-label" for="stBoughtRate">
+              Rate the credit buys
+              <button class="info" type="button" tabindex="0" data-tip="If the credit were spent on discount points instead, this is the rate you'd land at. Ask for today's actual point pricing — it varies daily.">i</button>
+            </label>
+            <div class="input-wrap">
+              <input type="text" inputmode="decimal" id="stBoughtRate" class="has-affix-right" value="5.875">
+              <span class="affix affix-right">%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>ARM option</h2></div>
+        <div class="card-body">
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label" for="stArmRate">ARM intro rate</label>
+              <div class="input-wrap">
+                <input type="text" inputmode="decimal" id="stArmRate" class="has-affix-right" value="5.75">
+                <span class="affix affix-right">%</span>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="stArmFixed">Fixed period</label>
+              <select id="stArmFixed">
+                <option value="36">3 years</option>
+                <option value="60" selected>5 years</option>
+                <option value="84">7 years</option>
+                <option value="120">10 years</option>
+              </select>
+            </div>
+          </div>
+          <div class="field mb-0">
+            <label class="field-label" for="stArmAdj">
+              Rate after it adjusts
+              <button class="info" type="button" tabindex="0" data-tip="Your assumption, not a promise. ARMs adjust with an index plus a margin, limited by caps — ask for the caps and run the worst case here too.">i</button>
+            </label>
+            <div class="input-wrap">
+              <input type="text" inputmode="decimal" id="stArmAdj" class="has-affix-right" value="7.25">
+              <span class="affix affix-right">%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div id="stError"></div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2 id="tbTitle">Temporary buydown</h2>
+            <div class="sub">What the payment does each year, and what the subsidy costs</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-scroll" id="tbTableWrap"></div>
+          <div id="tbNote" class="mt-16"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>The same credit, three ways</h2>
+            <div class="sub">Price cut vs. permanent buydown vs. temporary buydown — judged on interest actually paid over your stay</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-scroll" id="ccTableWrap"></div>
+          <div id="ccNote" class="mt-16"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>ARM vs. fixed</h2>
+            <div class="sub">On your own rate expectation — cumulative interest, and where the early savings run out</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="stat-grid" id="armStats"></div>
+          <div class="chart-box mt-16" id="armChart"></div>
+          <div class="legend" id="armLegend"></div>
+          <div id="armNote" class="mt-16"></div>
         </div>
       </div>
     </div>

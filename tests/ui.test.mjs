@@ -770,6 +770,151 @@ test('the NEO mark is legible in both themes', async () => {
   await page.waitForTimeout(400);
 });
 
+/* ------------------------------------------------------------------ */
+/* Buy vs Rent, Buy Now vs Wait, Rate Strategies                       */
+/* ------------------------------------------------------------------ */
+
+test('buy vs rent renders a verdict, stats and the wealth chart', async () => {
+  await page.click('#tab-buyrent');
+  await page.waitForTimeout(400);
+  const verdict = await text('#brVerdict .verdict-title');
+  assert.ok(verdict.length > 10, 'a verdict is rendered');
+  const stats = await page.$$eval('#brStats .stat', els => els.map(e => ({
+    label: e.querySelector('.stat-label').textContent.trim(),
+    value: e.querySelector('.stat-value').textContent.trim()
+  })));
+  assert.ok(stats.length >= 6, 'six stats');
+  const eq = stats.find(s => /Equivalent rent/i.test(s.label));
+  assert.ok(money(eq.value) > 1000, `equivalent rent is a real figure, got ${eq.value}`);
+  const svg = await page.$$eval('#brChart svg', els => els.length);
+  assert.equal(svg, 1, 'wealth chart draws');
+  const tables = await page.$$eval('#panel-buyrent table.data', els => els.length);
+  assert.equal(tables, 2, 'monthly-cost and horizon tables render');
+});
+
+test('buy vs rent verdict flips when the rent justifies buying', async () => {
+  const before = await text('#brVerdict .verdict-title');
+  assert.match(before, /Renting/i, 'default $2,600 rent favors renting at 7 years');
+  await page.fill('#brRent', '4,500');
+  await page.waitForTimeout(500);
+  const after = await text('#brVerdict .verdict-title');
+  assert.match(after, /Buying builds more wealth/i, 'at $4,500 rent, buying wins');
+  await page.fill('#brRent', '2,600');
+  await page.waitForTimeout(400);
+});
+
+test('buy vs rent monthly table reconciles to the engine', async () => {
+  const totals = await page.$$eval('#brMonthlyWrap tr.is-total td',
+    els => els.map(e => e.textContent.trim()));
+  const own = money(totals[1]);
+  // 2275.44 P&I + 412.50 tax + 150 ins + 375 maintenance = 3212.94
+  assert.ok(Math.abs(own - 3212.94) < 0.02, `own total ${own}`);
+  const rent = money(totals[3]);
+  assert.ok(Math.abs(rent - 2615) < 0.02, `rent total ${rent}`);
+});
+
+test('buy now vs wait quantifies the cost of waiting', async () => {
+  await page.click('#tab-wait');
+  await page.waitForTimeout(400);
+  assert.match(await text('#cwVerdict .verdict-title'), /Waiting/i);
+  const stats = await page.$$eval('#cwStats .stat', els => els.map(e => ({
+    label: e.querySelector('.stat-label').textContent.trim(),
+    value: e.querySelector('.stat-value').textContent.trim()
+  })));
+  const missed = stats.find(s => /Equity missed/i.test(s.label));
+  // 450k at 4% for 2 years: 36,720 appreciation + ~8,317 principal.
+  assert.ok(Math.abs(money(missed.value) - 45037) < 5, `equity missed ${missed.value}`);
+  const price = stats.find(s => /Price if you wait/i.test(s.label));
+  assert.ok(Math.abs(money(price.value) - 486720) < 5, `later price ${price.value}`);
+});
+
+test('bid over asking reports the recoup time and payment cost', async () => {
+  const stats = await page.$$eval('#boStats .stat', els => els.map(e => ({
+    label: e.querySelector('.stat-label').textContent.trim(),
+    value: e.querySelector('.stat-value').textContent.trim()
+  })));
+  const catchUp = stats.find(s => /catches your bid/i.test(s.label));
+  assert.match(catchUp.value, /11 month/, `15k over on 450k at 4%: 11 months, got ${catchUp.value}`);
+  const extra = stats.find(s => /Added to the payment/i.test(s.label));
+  assert.ok(money(extra.value) > 70 && money(extra.value) < 90,
+    `financing $12k of premium ≈ $76/mo, got ${extra.value}`);
+  const svg = await page.$$eval('#boChart svg', els => els.length);
+  assert.equal(svg, 1);
+});
+
+test('affordability lands on the binding DTI cap', async () => {
+  const stats = await page.$$eval('#afResult .stat', els => els.map(e => ({
+    label: e.querySelector('.stat-label').textContent.trim(),
+    value: e.querySelector('.stat-value').textContent.trim()
+  })));
+  const price = stats.find(s => /price in reach/i.test(s.label));
+  assert.ok(Math.abs(money(price.value) - 418557) < 10, `max price ${price.value}`);
+  const ratios = stats.find(s => /ratios/i.test(s.label));
+  assert.match(ratios.value, /28/, 'front-end cap binds at the default inputs');
+});
+
+test('temporary buydown table matches the engine and switches structure', async () => {
+  await page.click('#tab-strategy');
+  await page.waitForTimeout(400);
+  let rows = await page.$$eval('#tbTableWrap tbody tr', els => els.length);
+  assert.equal(rows, 4, '2-1: two buydown years + full-rate row + total');
+  const y1 = await page.$$eval('#tbTableWrap tbody tr:first-child td',
+    els => els.map(e => e.textContent.trim()));
+  assert.equal(money(y1[2]), 1824.07, 'year 1 pays the 4.5% payment');
+  assert.equal(money(y1[3]), 451.37, 'saves $451.37/mo');
+
+  await page.click('[data-bdtype="321"]');
+  await page.waitForTimeout(300);
+  rows = await page.$$eval('#tbTableWrap tbody tr', els => els.length);
+  assert.equal(rows, 5, '3-2-1 adds a year');
+  assert.match(await text('#tbTitle'), /3-2-1/);
+  await page.click('[data-bdtype="21"]');
+  await page.waitForTimeout(300);
+});
+
+test('the concession comparison names a winner on interest', async () => {
+  const head = await page.$$eval('#ccTableWrap thead th', els => els.map(e => e.textContent.trim()));
+  assert.deepEqual(head.slice(1), ['Price cut', 'Permanent buydown', 'Temporary 2-1']);
+  const note = await text('#ccNote');
+  assert.match(note, /wins here/i, 'a verdict is stated');
+  assert.match(note, /interest actually paid/i, 'and it is judged on interest');
+});
+
+test('ARM vs fixed shows the jump, the savings and the caveat', async () => {
+  const stats = await page.$$eval('#armStats .stat', els => els.map(e => ({
+    label: e.querySelector('.stat-label').textContent.trim(),
+    value: e.querySelector('.stat-value').textContent.trim(),
+    sub: e.querySelector('.stat-sub')?.textContent.trim() || ''
+  })));
+  const intro = stats.find(s => /ARM payment/i.test(s.label));
+  assert.equal(money(intro.value), 2100.86, '5.75% intro payment');
+  const adj = stats.find(s => /if it adjusts/i.test(s.label));
+  assert.ok(money(adj.value) > money(intro.value), 'adjusted payment is higher at 7.25%');
+  assert.match(await text('#armNote'), /your assumption/i, 'the honesty caveat is present');
+  const svg = await page.$$eval('#armChart svg', els => els.length);
+  assert.equal(svg, 1);
+});
+
+test('new-tab inputs survive a share-link round trip', async () => {
+  await page.click('#tab-buyrent');
+  await page.waitForTimeout(300);
+  await page.fill('#brRent', '3,100');
+  await page.waitForTimeout(500);
+  const hash = await page.evaluate(() => location.hash);
+  assert.ok(hash.includes('brRent=3100'), 'rent encoded in the URL');
+  assert.ok(hash.includes('bdt=21'), 'buydown structure encoded');
+
+  const p2 = await browser.newPage();
+  await p2.goto(BASE + hash, { waitUntil: 'networkidle' });
+  await p2.waitForTimeout(400);
+  assert.equal(await p2.inputValue('#brRent'), '3,100', 'rent restored with formatting');
+  assert.equal(await p2.inputValue('#brDownPct'), '20', 'percent restored without formatting');
+  await p2.close();
+
+  await page.fill('#brRent', '2,600');
+  await page.waitForTimeout(400);
+});
+
 test('the controls column scrolls independently of the results', async () => {
   const p2 = await browser.newPage({ viewport: { width: 1440, height: 800 } });
   await p2.goto(BASE, { waitUntil: 'networkidle' });
@@ -882,7 +1027,8 @@ test('no tab overflows horizontally at any viewport width', async () => {
   // A stray horizontal scrollbar is the classic mobile regression; check the
   // real thing rather than trusting the media queries.
   const widths = [320, 360, 390, 414, 600, 768, 1024, 1280];
-  const tabs = ['#tab-payment', '#tab-extra', '#tab-side', '#tab-refi', '#tab-compare'];
+  const tabs = ['#tab-payment', '#tab-extra', '#tab-side', '#tab-refi',
+    '#tab-buyrent', '#tab-wait', '#tab-strategy', '#tab-compare'];
   const failures = [];
   for (const w of widths) {
     const p2 = await browser.newPage({ viewport: { width: w, height: 844 }, isMobile: w < 500, hasTouch: w < 500 });

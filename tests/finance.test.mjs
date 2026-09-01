@@ -713,3 +713,265 @@ test('consolidation combines with cash-out without double counting', () => {
   assert.equal(r.newPrincipalConsolidated, 320000 + 67000 + 25000);
   assert.equal(r.newPrincipalRefiOnly, 320000 + 25000);
 });
+
+/* ------------------------------------------------------------------ *
+ * Buy vs. rent
+ * ------------------------------------------------------------------ */
+
+const BVR = {
+  price: 450000, downPayment: 90000, rate: 6.5, termMonths: 360,
+  buyClosingPct: 3, sellClosingPct: 6,
+  taxPct: 1.1, insuranceYr: 1800, hoaMonthly: 0, maintPct: 1, pmiRatePct: 0.5,
+  appreciationPct: 3, rent: 2600, rentGrowthPct: 3, rentersInsMo: 15,
+  investmentReturnPct: 7, horizonMonths: 84
+};
+
+test('buy vs rent: an all-cash house with free carrying costs wins from month one', () => {
+  // Both sides start with $100k. The buyer owns outright with zero carrying
+  // cost; the renter pays $500/mo with no investment growth. The buyer's side
+  // fund collects exactly the rent difference, so the ledger is hand-checkable.
+  const r = F.analyzeBuyVsRent({
+    price: 100000, downPayment: 100000, rate: 0, termMonths: 360,
+    buyClosingPct: 0, sellClosingPct: 0, taxPct: 0, insuranceYr: 0,
+    hoaMonthly: 0, maintPct: 0, pmiRatePct: 0, appreciationPct: 0,
+    rent: 500, rentGrowthPct: 0, rentersInsMo: 0,
+    investmentReturnPct: 0, horizonMonths: 12
+  });
+  assert.equal(r.breakEvenMonth, 1, 'ahead immediately');
+  approx(r.at.buyerNet, 106000, 0.01);   // house + 12 x $500 avoided rent
+  approx(r.at.renterNet, 100000, 0.01);  // $99,500 fund + $500 deposit back
+  approx(r.at.advantage, 6000, 0.01);
+});
+
+test('buy vs rent: free rent means buying never breaks even', () => {
+  // The renter pays nothing and banks every dollar the owner spends. With no
+  // appreciation or returns, the renter's fund always beats equity because
+  // interest is a pure cost.
+  const r = F.analyzeBuyVsRent({
+    ...BVR, rent: 0, rentGrowthPct: 0, rentersInsMo: 0,
+    appreciationPct: 0, investmentReturnPct: 0
+  });
+  assert.equal(r.breakEvenMonth, null);
+  assert.ok(r.at.advantage < 0);
+});
+
+test('buy vs rent: the equivalent rent balances the two paths at the horizon', () => {
+  const r = F.analyzeBuyVsRent(BVR);
+  assert.ok(r.equivalentRent > 0, 'a break-even rent exists');
+  const check = F.analyzeBuyVsRent({ ...BVR, rent: r.equivalentRent });
+  approx(check.at.advantage, 0, 5, 'feeding it back lands within dollars of even');
+  // And it must sit on the correct side of the actual rent given the verdict.
+  assert.ok(r.at.advantage < 0 === r.equivalentRent > BVR.rent,
+    'renting wins exactly when actual rent is below the equivalent rent');
+});
+
+test('buy vs rent: higher rent moves the verdict toward buying', () => {
+  const low = F.analyzeBuyVsRent({ ...BVR, rent: 1500 });
+  const high = F.analyzeBuyVsRent({ ...BVR, rent: 4000 });
+  assert.ok(high.at.advantage > low.at.advantage);
+  assert.ok(high.breakEvenMonth !== null && high.breakEvenMonth <= 84,
+    'at $4,000 rent buying breaks even well inside 7 years');
+});
+
+test('buy vs rent: PMI applies under 20% down and cancels at 78% LTV', () => {
+  const r = F.analyzeBuyVsRent({ ...BVR, downPayment: 45000 });
+  const loan = 405000;
+  approx(r.firstMonth.pmi, F.round2(loan * 0.005 / 12), 0.01);
+  assert.ok(r.firstMonth.ownTotal > 0);
+  // PMI is charged on the start-of-month balance, so the last PMI month is
+  // the one whose *ending* balance first dips under 78% of the price.
+  const idx = r.series.findIndex(s => s.balance <= 450000 * 0.78);
+  const lastWith = r.series[idx];
+  const firstWithout = r.series[idx + 1];
+  assert.ok(lastWith.ownCost - firstWithout.ownCost > 100,
+    'the month PMI drops, the owning cost falls by roughly the premium');
+  const twenty = F.analyzeBuyVsRent(BVR);
+  assert.equal(twenty.firstMonth.pmi, 0, 'no PMI at 20% down');
+});
+
+test('buy vs rent: first-month itemization adds up', () => {
+  const r = F.analyzeBuyVsRent(BVR);
+  const f = r.firstMonth;
+  approx(f.ownTotal, f.pi + f.tax + f.insurance + f.hoa + f.maintenance + f.pmi, 0.01);
+  approx(f.rentTotal, f.rent + f.rentersIns, 0.01);
+  approx(f.pi, 2275.44, 0.01, 'P&I matches the payment engine');
+  approx(f.tax, 412.50, 0.01);
+  approx(f.maintenance, 375, 0.01);
+});
+
+test('buy vs rent: rent grows annually, not monthly', () => {
+  const r = F.analyzeBuyVsRent({ ...BVR, rentGrowthPct: 10, rentersInsMo: 0 });
+  assert.equal(r.series[0].rentCost, r.series[11].rentCost, 'flat within the first year');
+  approx(r.series[12].rentCost, F.round2(2600 * 1.10), 0.01, 'steps up at the anniversary');
+});
+
+test('buy vs rent: guards reject a missing price and impossible inputs', () => {
+  assert.equal(F.analyzeBuyVsRent({ price: 0 }).error, 'price');
+  assert.equal(F.analyzeBuyVsRent({}).error, 'price');
+  const r = F.analyzeBuyVsRent({ ...BVR, downPayment: 900000 });
+  assert.equal(r.loanAmount, 0, 'down payment is clamped to the price');
+  assert.equal(r.error, undefined);
+});
+
+test('buy vs rent: selling costs are why buying starts behind', () => {
+  const r = F.analyzeBuyVsRent(BVR);
+  const m1 = r.series[0];
+  assert.ok(m1.buyerNet < m1.renterNet, 'month one favors the renter');
+  const noSell = F.analyzeBuyVsRent({ ...BVR, sellClosingPct: 0, buyClosingPct: 0 });
+  assert.ok(noSell.series[0].buyerNet > r.series[0].buyerNet,
+    'remove transaction costs and the gap shrinks');
+});
+
+/* ------------------------------------------------------------------ *
+ * Cost of waiting, bid over ask, affordability, rate strategies
+ * ------------------------------------------------------------------ */
+
+test('cost of waiting: price, down payment and payment all rise with appreciation', () => {
+  const r = F.analyzeCostOfWaiting({
+    price: 450000, downPct: 20, rateNow: 6.5, rateLater: 6.5,
+    termMonths: 360, appreciationPct: 4, waitMonths: 24
+  });
+  approx(r.priceLater, 450000 * 1.04 ** 2, 0.5, 'two full years of compounding');
+  approx(r.downIncrease, r.priceIncrease * 0.20, 0.5);
+  assert.ok(r.paymentIncrease > 0);
+  // Equity missed = appreciation + principal paid over the wait.
+  const bal = F.balanceAfter(360000, 6.5, 360, 24);
+  approx(r.equityMissed, (r.priceLater - 450000) + (360000 - bal), 0.5);
+  assert.equal(r.series.length, 24);
+});
+
+test('cost of waiting: a rate drop while waiting can offset the price rise', () => {
+  const flat = F.analyzeCostOfWaiting({
+    price: 450000, downPct: 20, rateNow: 6.5, rateLater: 6.5,
+    termMonths: 360, appreciationPct: 4, waitMonths: 12
+  });
+  const drop = F.analyzeCostOfWaiting({
+    price: 450000, downPct: 20, rateNow: 6.5, rateLater: 5.0,
+    termMonths: 360, appreciationPct: 4, waitMonths: 12
+  });
+  assert.ok(drop.paymentLater < flat.paymentLater, 'lower future rate, lower future payment');
+  assert.ok(drop.paymentIncrease < 0, 'a big enough drop makes the later payment smaller');
+  assert.equal(drop.equityMissed, flat.equityMissed,
+    'but the missed appreciation and amortization are unchanged');
+});
+
+test('bid over ask: appreciation recoups the premium on schedule', () => {
+  const r = F.analyzeBidOverAsk({
+    askingPrice: 450000, bidPrice: 465000, appreciationPct: 4,
+    rate: 6.5, termMonths: 360, downPct: 20
+  });
+  // 450000 * 1.04^(m/12) >= 465000  =>  m >= 12 * ln(465/450)/ln(1.04) ≈ 10.03
+  assert.equal(r.recoupMonth, 11, 'first whole month at or past the bid');
+  approx(r.premium, 15000, 0.01);
+  approx(r.premiumFinanced, 12000, 0.01);
+  approx(r.premiumCash, 3000, 0.01);
+  approx(r.paymentExtra, F.payment(372000, 6.5, 360) - F.payment(360000, 6.5, 360), 0.01);
+  assert.ok(r.equityIn5 > 0, 'five years of appreciation clears the bid');
+});
+
+test('bid over ask: zero appreciation never recoups; bidding under asking is instant', () => {
+  const flat = F.analyzeBidOverAsk({
+    askingPrice: 450000, bidPrice: 465000, appreciationPct: 0,
+    rate: 6.5, termMonths: 360, downPct: 20
+  });
+  assert.equal(flat.recoupMonth, null);
+  const under = F.analyzeBidOverAsk({
+    askingPrice: 450000, bidPrice: 440000, appreciationPct: 3,
+    rate: 6.5, termMonths: 360, downPct: 20
+  });
+  assert.equal(under.recoupMonth, 0);
+  assert.ok(under.paymentExtra < 0);
+});
+
+test('affordability: hits the binding DTI cap exactly', () => {
+  const r = F.affordability({
+    annualIncome: 120000, monthlyDebts: 500, downPayment: 60000,
+    rate: 6.5, termMonths: 360, taxPct: 1.1, insuranceYr: 1800, hoaMonthly: 0
+  });
+  // front cap = 2800, back cap = 3600 - 500 = 3100: front-end binds.
+  approx(r.housing, 2800, 1);
+  approx(r.frontRatio, 28, 0.1);
+  assert.ok(r.backRatio < 36);
+  // Verify the found price really carries that housing cost.
+  const check = F.payment(r.maxPrice - 60000, 6.5, 360) +
+    r.maxPrice * 1.1 / 100 / 12 + 150;
+  approx(check, 2800, 2);
+});
+
+test('affordability: heavy debts flip the binding cap to the back end', () => {
+  const r = F.affordability({
+    annualIncome: 120000, monthlyDebts: 1500, downPayment: 60000,
+    rate: 6.5, termMonths: 360, taxPct: 1.1, insuranceYr: 1800, hoaMonthly: 0
+  });
+  // back cap = 3600 - 1500 = 2100 < front cap 2800.
+  approx(r.housing, 2100, 1);
+  approx(r.backRatio, 36, 0.1);
+  const light = F.affordability({
+    annualIncome: 120000, monthlyDebts: 0, downPayment: 60000,
+    rate: 6.5, termMonths: 360, taxPct: 1.1, insuranceYr: 1800, hoaMonthly: 0
+  });
+  assert.ok(light.maxPrice > r.maxPrice, 'less debt affords more house');
+});
+
+test('temporary buydown: subsidy equals the payment differences, year by year', () => {
+  const r = F.analyzeTempBuydown({ loanAmount: 360000, rate: 6.5, termMonths: 360, steps: [2, 1] });
+  approx(r.years[0].payment, F.payment(360000, 4.5, 360), 0.01, 'year 1 pays the 4.5% payment');
+  approx(r.years[1].payment, F.payment(360000, 5.5, 360), 0.01, 'year 2 pays the 5.5% payment');
+  approx(r.totalCost,
+    (r.fullPayment - r.years[0].payment) * 12 + (r.fullPayment - r.years[1].payment) * 12, 0.02);
+  const three = F.analyzeTempBuydown({ loanAmount: 360000, rate: 6.5, termMonths: 360, steps: [3, 2, 1] });
+  assert.equal(three.years.length, 3);
+  assert.ok(three.totalCost > r.totalCost, '3-2-1 costs more than 2-1');
+});
+
+test('concession three ways: price cut, points, temporary buydown', () => {
+  const r = F.analyzeConcessionVsPriceCut({
+    price: 450000, concession: 15000, downPct: 20, rate: 6.5,
+    boughtRate: 5.875, termMonths: 360, horizonMonths: 84
+  });
+  approx(r.priceCut.loanAmount, 435000 * 0.8, 0.01);
+  approx(r.permanent.loanAmount, 360000, 0.01);
+  assert.ok(r.permanent.payment < r.basePayment, 'points lower the ongoing payment');
+  assert.ok(r.priceCut.payment < r.basePayment, 'a smaller loan lowers it too');
+  assert.ok(r.permanent.interestAtHorizon < r.temporary.interestAtHorizon,
+    'permanent buydown saves real interest; a temporary one does not touch the note rate');
+  approx(r.priceCut.instantEquity, 15000, 0.01);
+  assert.ok(r.temporary.totalCost < 15000, 'a 2-1 on this loan costs less than the credit');
+});
+
+test('ARM vs fixed: intro savings, payment jump, and the honest crossover', () => {
+  const r = F.analyzeArmVsFixed({
+    loanAmount: 360000, termMonths: 360, fixedRate: 6.5,
+    armRate: 5.75, armFixedMonths: 60, armAdjustedRate: 7.25, horizonMonths: 120
+  });
+  approx(r.paymentFixed, F.payment(360000, 6.5, 360), 0.01);
+  approx(r.paymentArmIntro, F.payment(360000, 5.75, 360), 0.01);
+  const balAdj = F.balanceAfter(360000, 5.75, 360, 60);
+  approx(r.paymentArmAfter, F.payment(balAdj, 7.25, 300), 0.01,
+    're-amortized over the remaining 25 years');
+  assert.ok(r.paymentJump > 0, 'the adjusted payment is higher');
+  assert.ok(r.crossoverMonth === null || r.crossoverMonth > 60,
+    'the ARM cannot fall behind before it adjusts');
+  // At the 5-year mark the ARM is strictly ahead on interest.
+  const atSixty = r.series[59];
+  assert.ok(atSixty.armInterest < atSixty.fixedInterest);
+});
+
+test('ARM vs fixed: if the rate never rises the ARM never crosses over', () => {
+  const r = F.analyzeArmVsFixed({
+    loanAmount: 360000, termMonths: 360, fixedRate: 6.5,
+    armRate: 5.75, armFixedMonths: 60, armAdjustedRate: 5.75, horizonMonths: 360
+  });
+  assert.equal(r.crossoverMonth, null);
+  assert.ok(r.interestSavedAtHorizon > 0);
+});
+
+test('new analyses guard against unusable inputs', () => {
+  assert.equal(F.analyzeCostOfWaiting({ price: 0 }).error, 'price');
+  assert.equal(F.analyzeBidOverAsk({ askingPrice: 0, bidPrice: 100 }).error, 'price');
+  assert.equal(F.affordability({ annualIncome: 0 }).error, 'income');
+  assert.equal(F.affordability({ annualIncome: 60000, monthlyDebts: 5000 }).error, 'budget');
+  assert.equal(F.analyzeTempBuydown({ loanAmount: 0 }).error, 'loan');
+  assert.equal(F.analyzeConcessionVsPriceCut({ price: 450000, concession: 0 }).error, 'inputs');
+  assert.equal(F.analyzeArmVsFixed({ loanAmount: 0 }).error, 'loan');
+});

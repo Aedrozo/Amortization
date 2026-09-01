@@ -922,6 +922,559 @@
     };
   }
 
+
+
+  /* ------------------------------------------------------------------ *
+   * Buy now vs. wait — the MBS Highway "Cost of Waiting" analysis
+   * ------------------------------------------------------------------ */
+
+  /**
+   * What waiting costs: while a buyer waits, the price appreciates (a bigger
+   * loan and down payment), the rate may move, and every month of waiting is
+   * a month of appreciation and amortization someone else collects.
+   *
+   * opts = { price, downPct, rateNow, rateLater, termMonths,
+   *          appreciationPct, waitMonths, start }
+   */
+  function analyzeCostOfWaiting(opts) {
+    opts = opts || {};
+    var price = num(opts.price);
+    if (!(price > 0)) return { error: 'price' };
+    var downPct = clampNum(num(opts.downPct), 0, 100);
+    var rateNow = clampNum(num(opts.rateNow), 0, 30);
+    var rateLater = clampNum(num(opts.rateLater), 0, 30);
+    var termM = Math.round(clampNum(num(opts.termMonths) || 360, 12, 600));
+    var apprPct = clampNum(num(opts.appreciationPct), -20, 20);
+    var waitM = Math.round(clampNum(num(opts.waitMonths) || 12, 1, 120));
+
+    var priceLater = price * Math.pow(1 + apprPct / 100, waitM / 12);
+    var downNow = price * downPct / 100;
+    var downLater = priceLater * downPct / 100;
+    var loanNow = price - downNow;
+    var loanLater = priceLater - downLater;
+    var pmtNow = loanNow > 0 ? payment(loanNow, rateNow, termM) : 0;
+    var pmtLater = loanLater > 0 ? payment(loanLater, rateLater, termM) : 0;
+
+    // Equity the buy-now buyer holds by the end of the wait: the appreciation
+    // plus the principal their payments retired.
+    var appreciationGain = priceLater - price;
+    var balAtWait = loanNow > 0 ? balanceAfter(loanNow, rateNow, termM, waitM) : 0;
+    var amortizationGain = loanNow - balAtWait;
+
+    // Month-by-month equity curve for the chart.
+    var series = [];
+    for (var m = 1; m <= waitM; m++) {
+      var v = price * Math.pow(1 + apprPct / 100, m / 12);
+      var b = loanNow > 0 ? balanceAfter(loanNow, rateNow, termM, m) : 0;
+      series.push({
+        m: m,
+        homeValue: round2(v),
+        equity: round2((v - price) + (loanNow - b) + downNow)
+      });
+    }
+
+    var start = opts.start || todayYM();
+    return {
+      priceNow: round2(price), priceLater: round2(priceLater),
+      priceIncrease: round2(priceLater - price),
+      downNow: round2(downNow), downLater: round2(downLater),
+      downIncrease: round2(downLater - downNow),
+      loanNow: round2(loanNow), loanLater: round2(loanLater),
+      paymentNow: pmtNow, paymentLater: pmtLater,
+      paymentIncrease: round2(pmtLater - pmtNow),
+      appreciationGain: round2(appreciationGain),
+      amortizationGain: round2(amortizationGain),
+      equityMissed: round2(appreciationGain + amortizationGain),
+      // Payment delta carried across the full term is the long tail of waiting.
+      lifetimePaymentCost: round2((pmtLater - pmtNow) * termM),
+      waitMonths: waitM,
+      buyDate: start,
+      laterDate: addMonths(start, waitM),
+      series: series
+    };
+  }
+
+  /**
+   * Bid over asking — how long appreciation takes to cover the premium, and
+   * what the premium adds to the monthly payment.
+   * opts = { askingPrice, bidPrice, appreciationPct, rate, termMonths, downPct }
+   */
+  function analyzeBidOverAsk(opts) {
+    opts = opts || {};
+    var ask = num(opts.askingPrice);
+    var bid = num(opts.bidPrice);
+    if (!(ask > 0) || !(bid > 0)) return { error: 'price' };
+    var apprPct = clampNum(num(opts.appreciationPct), -20, 20);
+    var rate = clampNum(num(opts.rate), 0, 30);
+    var termM = Math.round(clampNum(num(opts.termMonths) || 360, 12, 600));
+    var downPct = clampNum(num(opts.downPct), 0, 100);
+
+    var premium = bid - ask;
+    // The market value starts at the asking price and appreciates from there.
+    var recoupMonth = null;
+    var series = [];
+    var horizon = 60;
+    for (var m = 0; m <= horizon; m++) {
+      var v = ask * Math.pow(1 + apprPct / 100, m / 12);
+      if (recoupMonth === null && v >= bid) recoupMonth = m;
+      series.push({ m: m, homeValue: round2(v) });
+    }
+    if (premium <= 0) recoupMonth = 0;
+
+    var loanAsk = ask * (1 - downPct / 100);
+    var loanBid = bid * (1 - downPct / 100);
+    var pmtAsk = loanAsk > 0 ? payment(loanAsk, rate, termM) : 0;
+    var pmtBid = loanBid > 0 ? payment(loanBid, rate, termM) : 0;
+
+    return {
+      premium: round2(premium),
+      premiumCash: round2(premium * downPct / 100),
+      premiumFinanced: round2(premium * (1 - downPct / 100)),
+      paymentExtra: round2(pmtBid - pmtAsk),
+      paymentExtraDaily: round2((pmtBid - pmtAsk) * 12 / 365),
+      recoupMonth: recoupMonth,          // null: not within 5 years
+      valueIn5: round2(ask * Math.pow(1 + apprPct / 100, 5)),
+      equityIn5: round2(ask * Math.pow(1 + apprPct / 100, 5) - bid),
+      series: series
+    };
+  }
+
+  /**
+   * How much home the income affords, under standard 28/36-style DTI caps.
+   * The front-end cap limits total housing (PITI + HOA); the back-end cap
+   * limits housing plus other monthly debts. The binding one wins.
+   * opts = { annualIncome, monthlyDebts, downPayment, rate, termMonths,
+   *          taxPct, insuranceYr, hoaMonthly, frontPct, backPct }
+   */
+  function affordability(opts) {
+    opts = opts || {};
+    var income = num(opts.annualIncome);
+    if (!(income > 0)) return { error: 'income' };
+    var moIncome = income / 12;
+    var debts = Math.max(0, num(opts.monthlyDebts));
+    var down = Math.max(0, num(opts.downPayment));
+    var rate = clampNum(num(opts.rate), 0, 30);
+    var termM = Math.round(clampNum(num(opts.termMonths) || 360, 12, 600));
+    var taxPct = clampNum(num(opts.taxPct), 0, 10);
+    var insuranceYr = Math.max(0, num(opts.insuranceYr));
+    var hoa = Math.max(0, num(opts.hoaMonthly));
+    var frontPct = clampNum(num(opts.frontPct) || 28, 5, 60);
+    var backPct = clampNum(num(opts.backPct) || 36, 5, 70);
+
+    var housingBudget = Math.min(moIncome * frontPct / 100,
+      moIncome * backPct / 100 - debts);
+    if (housingBudget <= hoa + insuranceYr / 12) {
+      return { error: 'budget', housingBudget: round2(Math.max(0, housingBudget)) };
+    }
+
+    // Price -> housing cost is monotonic; bisect the price.
+    var housingFor = function (price) {
+      var loan = Math.max(0, price - down);
+      var pi = loan > 0 ? payment(loan, rate, termM) : 0;
+      return pi + price * taxPct / 100 / 12 + insuranceYr / 12 + hoa;
+    };
+    var lo = 0, hi = Math.max(down + 50000, 100000);
+    var guard = 0;
+    while (housingFor(hi) < housingBudget && guard++ < 30) hi *= 2;
+    for (var i = 0; i < 60; i++) {
+      var mid = (lo + hi) / 2;
+      if (housingFor(mid) > housingBudget) hi = mid; else lo = mid;
+    }
+    var price = lo;
+    var loan = Math.max(0, price - down);
+    var pi = loan > 0 ? payment(loan, rate, termM) : 0;
+    return {
+      maxPrice: round2(price),
+      loanAmount: round2(loan),
+      payment: pi,
+      housingBudget: round2(housingBudget),
+      housing: round2(housingFor(price)),
+      frontRatio: round2(housingFor(price) / moIncome * 100),
+      backRatio: round2((housingFor(price) + debts) / moIncome * 100)
+    };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Rate structuring — buydowns, concessions, ARM vs. fixed
+   * ------------------------------------------------------------------ */
+
+  /**
+   * Temporary buydown (3-2-1, 2-1, 1-0): the borrower pays as if the rate
+   * were reduced during the early years; an escrowed subsidy (usually
+   * seller-funded) covers the difference. The note itself amortizes at the
+   * full rate the whole time, so the subsidy cost is exactly the sum of the
+   * payment differences.
+   * opts = { loanAmount, rate, termMonths, steps: [3,2,1] | [2,1] | [1] }
+   */
+  function analyzeTempBuydown(opts) {
+    opts = opts || {};
+    var loan = num(opts.loanAmount);
+    if (!(loan > 0)) return { error: 'loan' };
+    var rate = clampNum(num(opts.rate), 0, 30);
+    var termM = Math.round(clampNum(num(opts.termMonths) || 360, 12, 600));
+    var steps = (opts.steps && opts.steps.length ? opts.steps : [2, 1])
+      .map(function (s) { return clampNum(num(s), 0, rate); });
+
+    var fullPmt = payment(loan, rate, termM);
+    var years = steps.map(function (reduction, i) {
+      var r = Math.max(0, rate - reduction);
+      var pmt = payment(loan, r, termM);
+      return {
+        year: i + 1,
+        rate: round4(r),
+        reduction: round4(reduction),
+        payment: pmt,
+        monthlySavings: round2(fullPmt - pmt),
+        annualSavings: round2((fullPmt - pmt) * 12)
+      };
+    });
+    var totalCost = round2(years.reduce(function (a, y) { return a + y.annualSavings; }, 0));
+    return {
+      fullPayment: fullPmt,
+      years: years,
+      afterYears: steps.length,
+      totalCost: totalCost
+    };
+  }
+
+  /**
+   * The same seller credit, three ways: cut the price, buy the rate down
+   * permanently, or fund a temporary buydown. Judged over the months the
+   * buyer expects to keep the loan — on interest actually paid, consistent
+   * with the rest of this calculator.
+   * opts = { price, concession, downPct, rate, boughtRate, termMonths,
+   *          horizonMonths, tempSteps }
+   */
+  function analyzeConcessionVsPriceCut(opts) {
+    opts = opts || {};
+    var price = num(opts.price);
+    var concession = num(opts.concession);
+    if (!(price > 0) || !(concession > 0)) return { error: 'inputs' };
+    var downPct = clampNum(num(opts.downPct), 0, 100);
+    var rate = clampNum(num(opts.rate), 0, 30);
+    var boughtRate = clampNum(num(opts.boughtRate), 0, rate);
+    var termM = Math.round(clampNum(num(opts.termMonths) || 360, 12, 600));
+    var horizon = Math.round(clampNum(num(opts.horizonMonths) || 84, 12, termM));
+
+    function interestOver(principal, r, m) {
+      if (!(principal > 0)) return 0;
+      var pmt = payment(principal, r, termM);
+      var paid = Math.min(m, termM) * pmt;
+      var bal = balanceAfter(principal, r, termM, Math.min(m, termM));
+      return paid - (principal - bal);
+    }
+
+    // A: price cut — smaller loan at the full rate.
+    var priceA = price - concession;
+    var loanA = priceA * (1 - downPct / 100);
+    var pmtA = payment(loanA, rate, termM);
+
+    // B: permanent buydown — full price, credit pays points for a lower rate.
+    var loanB = price * (1 - downPct / 100);
+    var pmtB = payment(loanB, boughtRate, termM);
+
+    // C: temporary 2-1 buydown — full price and rate, credit escrowed to
+    // subsidise the first two years. Cost may differ from the concession.
+    var temp = analyzeTempBuydown({
+      loanAmount: loanB, rate: rate, termMonths: termM,
+      steps: opts.tempSteps || [2, 1]
+    });
+
+    var horizonYears = horizon / 12;
+    var subsidyUsed = 0;
+    temp.years.forEach(function (y) {
+      var frac = Math.min(1, Math.max(0, horizonYears - (y.year - 1)));
+      subsidyUsed += y.annualSavings * frac;
+    });
+
+    return {
+      concession: round2(concession),
+      horizonMonths: horizon,
+      priceCut: {
+        loanAmount: round2(loanA), payment: pmtA,
+        interestAtHorizon: round2(interestOver(loanA, rate, horizon)),
+        downPayment: round2(priceA * downPct / 100),
+        instantEquity: round2(concession)
+      },
+      permanent: {
+        loanAmount: round2(loanB), payment: pmtB, rate: round4(boughtRate),
+        interestAtHorizon: round2(interestOver(loanB, boughtRate, horizon))
+      },
+      temporary: {
+        loanAmount: round2(loanB), fullPayment: temp.fullPayment,
+        years: temp.years, totalCost: temp.totalCost,
+        interestAtHorizon: round2(interestOver(loanB, rate, horizon)),
+        subsidyUsedAtHorizon: round2(subsidyUsed),
+        leftoverVsConcession: round2(concession - temp.totalCost)
+      },
+      basePayment: payment(loanB, rate, termM)
+    };
+  }
+
+  /**
+   * ARM vs. fixed, on the buyer's own rate expectation. The ARM holds its
+   * intro rate for the fixed period, then re-amortizes the remaining balance
+   * over the remaining term at the expected adjusted rate. Interest paid is
+   * the comparison — consistent with the rest of this calculator — plus the
+   * crossover month where the ARM's early savings are gone.
+   * opts = { loanAmount, termMonths, fixedRate, armRate, armFixedMonths,
+   *          armAdjustedRate, horizonMonths }
+   */
+  function analyzeArmVsFixed(opts) {
+    opts = opts || {};
+    var loan = num(opts.loanAmount);
+    if (!(loan > 0)) return { error: 'loan' };
+    var termM = Math.round(clampNum(num(opts.termMonths) || 360, 12, 600));
+    var fixedRate = clampNum(num(opts.fixedRate), 0, 30);
+    var armRate = clampNum(num(opts.armRate), 0, 30);
+    var armFixedM = Math.round(clampNum(num(opts.armFixedMonths) || 60, 12, termM));
+    var armAdjRate = clampNum(num(opts.armAdjustedRate), 0, 30);
+    var horizon = Math.round(clampNum(num(opts.horizonMonths) || 84, 12, termM));
+
+    var pmtFixed = payment(loan, fixedRate, termM);
+    var pmtArm1 = payment(loan, armRate, termM);
+    var balAtAdjust = balanceAfter(loan, armRate, termM, armFixedM);
+    var pmtArm2 = termM > armFixedM
+      ? payment(balAtAdjust, armAdjRate, termM - armFixedM) : 0;
+
+    var mFixed = monthlyRate(fixedRate);
+    var mArm1 = monthlyRate(armRate);
+    var mArm2 = monthlyRate(armAdjRate);
+
+    var balF = loan, balA = loan;
+    var cumIntF = 0, cumIntA = 0;
+    var crossoverMonth = null;
+    var series = [];
+    for (var m = 1; m <= horizon && m <= termM; m++) {
+      if (balF > 0.005) {
+        var iF = balF * mFixed;
+        balF = Math.max(0, balF - (pmtFixed - iF));
+        cumIntF += iF;
+      }
+      if (balA > 0.005) {
+        var rA = m <= armFixedM ? mArm1 : mArm2;
+        var pA = m <= armFixedM ? pmtArm1 : pmtArm2;
+        var iA = balA * rA;
+        balA = Math.max(0, balA - (pA - iA));
+        cumIntA += iA;
+      }
+      if (crossoverMonth === null && m > armFixedM && cumIntA >= cumIntF) crossoverMonth = m;
+      series.push({ m: m, fixedInterest: round2(cumIntF), armInterest: round2(cumIntA) });
+    }
+
+    return {
+      paymentFixed: pmtFixed,
+      paymentArmIntro: pmtArm1,
+      paymentArmAfter: round2(pmtArm2),
+      paymentJump: round2(pmtArm2 - pmtArm1),
+      armFixedMonths: armFixedM,
+      interestFixedAtHorizon: round2(cumIntF),
+      interestArmAtHorizon: round2(cumIntA),
+      interestSavedAtHorizon: round2(cumIntF - cumIntA),
+      balanceFixedAtHorizon: round2(balF),
+      balanceArmAtHorizon: round2(balA),
+      crossoverMonth: crossoverMonth,
+      series: series
+    };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Buy vs. rent
+   * ------------------------------------------------------------------ */
+
+  /**
+   * Opportunity-cost comparison of buying a home against renting one —
+   * the methodology behind the NYT rent-vs-buy calculator, which most
+   * professional tools follow. Both paths start with the same cash (down
+   * payment + buying costs): the buyer puts it into the home, the renter
+   * invests it. Whichever path is cheaper in a given month invests the
+   * difference too. Net wealth each month:
+   *
+   *   buyer  = home value − selling costs − loan balance + buyer side fund
+   *   renter = investment fund + returned security deposit (one month rent)
+   *
+   * Costs linked to the home’s value (tax, insurance, maintenance) grow
+   * with it; HOA dues grow at the rent-growth rate as an inflation proxy;
+   * PMI applies under 20% down and cancels at 78% of the original value
+   * (Homeowners Protection Act). Mortgage-interest tax deductions are NOT
+   * modeled: since the 2018 standard-deduction increase most filers see no
+   * benefit, and modeling one would overstate the case for buying.
+   *
+   * opts = {
+   *   price, downPayment, rate, termMonths,
+   *   buyClosingPct, sellClosingPct,
+   *   taxPct, insuranceYr, hoaMonthly, maintPct, pmiRatePct,
+   *   appreciationPct,
+   *   rent, rentGrowthPct, rentersInsMo,
+   *   investmentReturnPct, horizonMonths, start: {year, month}
+   * }
+   */
+  function analyzeBuyVsRent(opts) {
+    opts = opts || {};
+    var price = num(opts.price);
+    if (!(price > 0)) return { error: 'price' };
+    var down = clampNum(num(opts.downPayment), 0, price);
+    var rate = clampNum(num(opts.rate), 0, 30);
+    var termM = Math.round(clampNum(num(opts.termMonths) || 360, 12, 600));
+    var buyClosePct = clampNum(num(opts.buyClosingPct), 0, 20);
+    var sellClosePct = clampNum(num(opts.sellClosingPct), 0, 20);
+    var taxPct = clampNum(num(opts.taxPct), 0, 10);
+    var insuranceYr = Math.max(0, num(opts.insuranceYr));
+    var hoaMonthly = Math.max(0, num(opts.hoaMonthly));
+    var maintPct = clampNum(num(opts.maintPct), 0, 10);
+    var pmiRatePct = clampNum(num(opts.pmiRatePct), 0, 5);
+    var apprPct = clampNum(num(opts.appreciationPct), -20, 20);
+    var rent0 = Math.max(0, num(opts.rent));
+    var rentGrowthPct = clampNum(num(opts.rentGrowthPct), -10, 20);
+    var rentersInsMo = Math.max(0, num(opts.rentersInsMo));
+    var investPct = clampNum(num(opts.investmentReturnPct), -20, 30);
+    var horizon = Math.round(clampNum(num(opts.horizonMonths) || 84, 1, MAX_MONTHS));
+    var months = Math.min(MAX_MONTHS, Math.max(360, horizon));
+
+    var loan = round2(price - down);
+    var pmt = loan > 0 ? payment(loan, rate, termM) : 0;
+    if (loan > 0 && !(pmt > 0)) return { error: 'inputs' };
+
+    var buyClose = round2(price * buyClosePct / 100);
+    var initialCash = round2(down + buyClose);
+    var mAppr = Math.pow(1 + apprPct / 100, 1 / 12) - 1;
+    var mInv = Math.pow(1 + investPct / 100, 1 / 12) - 1;
+    var mRate = monthlyRate(rate);
+    var mRentGrow = Math.pow(1 + rentGrowthPct / 100, 1 / 12);
+    // PMI: flat premium on the original loan, auto-cancelled at 78% LTV of
+    // the original value, matching the servicer behaviour in buildSchedule.
+    var pmiMo = (pmiRatePct > 0 && loan > 0 && down / price < 0.2)
+      ? round2(loan * pmiRatePct / 100 / 12) : 0;
+    var pmiStopBal = price * 0.78;
+
+    /** One full simulation for a given starting rent. */
+    function run(startRent, keepSeries) {
+      var deposit = startRent; // security deposit: parked, returned at exit
+      var homeValue = price, balance = loan, rent = startRent;
+      var renterFund = Math.max(0, initialCash - deposit);
+      var buyerFund = 0;
+      var series = keepSeries ? [] : null;
+      var breakEvenMonth = null;
+      var cumOwn = 0, cumRent = 0;
+      var atH = null;
+
+      for (var m = 1; m <= months; m++) {
+        homeValue *= 1 + mAppr;
+
+        var interest = 0, principalPart = 0, pi = 0;
+        if (balance > 0.005) {
+          interest = balance * mRate;
+          principalPart = Math.min(Math.max(pmt - interest, 0), balance);
+          pi = interest + principalPart;
+        }
+
+        var pmiNow = (pmiMo > 0 && balance > pmiStopBal) ? pmiMo : 0;
+        var scale = homeValue / price;
+        var ownCost = pi +
+          (homeValue * taxPct / 100) / 12 +
+          (insuranceYr * scale) / 12 +
+          hoaMonthly * Math.pow(mRentGrow, m - 1) +
+          (homeValue * maintPct / 100) / 12 +
+          pmiNow;
+        var rentCost = rent + rentersInsMo;
+
+        renterFund *= 1 + mInv;
+        buyerFund *= 1 + mInv;
+        var diff = ownCost - rentCost;
+        if (diff > 0) renterFund += diff; else buyerFund += -diff;
+
+        balance -= principalPart;
+        if (balance < 0.005) balance = 0;
+        cumOwn += ownCost;
+        cumRent += rentCost;
+
+        var buyerNet = homeValue * (1 - sellClosePct / 100) - balance + buyerFund;
+        var renterNet = renterFund + deposit;
+        if (breakEvenMonth === null && buyerNet >= renterNet) breakEvenMonth = m;
+
+        if (keepSeries) {
+          series.push({
+            m: m, ownCost: round2(ownCost), rentCost: round2(rentCost),
+            homeValue: round2(homeValue), balance: round2(balance),
+            buyerNet: round2(buyerNet), renterNet: round2(renterNet),
+            cumOwn: round2(cumOwn), cumRent: round2(cumRent)
+          });
+        }
+        if (m === horizon) {
+          atH = {
+            buyerNet: round2(buyerNet), renterNet: round2(renterNet),
+            advantage: round2(buyerNet - renterNet),
+            homeValue: round2(homeValue), balance: round2(balance),
+            equity: round2(homeValue - balance),
+            sellingCost: round2(homeValue * sellClosePct / 100),
+            buyerFund: round2(buyerFund), renterFund: round2(renterFund),
+            deposit: round2(deposit),
+            cumOwn: round2(cumOwn), cumRent: round2(cumRent)
+          };
+        }
+
+        if (m % 12 === 0) rent *= Math.pow(mRentGrow, 12);
+      }
+      return { series: series, breakEvenMonth: breakEvenMonth, at: atH };
+    }
+
+    var main = run(rent0, true);
+
+    // Equivalent rent: the starting rent at which, over the horizon, renting
+    // and buying end up with the same net wealth — the NYT headline number.
+    // Advantage-to-buying rises with rent, so bisection converges cleanly.
+    var equivalentRent = null;
+    if (run(0, false).at.advantage >= 0) {
+      equivalentRent = 0; // buying wins even against free rent
+    } else {
+      var lo = 0, hi = 1000;
+      var guard = 0;
+      while (run(hi, false).at.advantage < 0 && guard++ < 12) hi *= 2;
+      if (run(hi, false).at.advantage >= 0) {
+        for (var i = 0; i < 50; i++) {
+          var mid = (lo + hi) / 2;
+          if (run(mid, false).at.advantage >= 0) hi = mid; else lo = mid;
+        }
+        equivalentRent = round2(hi);
+      }
+    }
+
+    // Today’s monthly cost of each path, itemized from the starting values
+    // (before any growth), for the side-by-side cost table.
+    var firstMonth = {
+      pi: round2(pmt),
+      tax: round2(price * taxPct / 100 / 12),
+      insurance: round2(insuranceYr / 12),
+      hoa: round2(hoaMonthly),
+      maintenance: round2(price * maintPct / 100 / 12),
+      pmi: round2(pmiMo),
+      rent: round2(rent0),
+      rentersIns: round2(rentersInsMo)
+    };
+    firstMonth.ownTotal = round2(firstMonth.pi + firstMonth.tax + firstMonth.insurance +
+      firstMonth.hoa + firstMonth.maintenance + firstMonth.pmi);
+    firstMonth.rentTotal = round2(firstMonth.rent + firstMonth.rentersIns);
+
+    var start = opts.start || todayYM();
+    return {
+      payment: pmt,
+      loanAmount: loan,
+      downPayment: round2(down),
+      buyClose: buyClose,
+      initialCash: initialCash,
+      deposit: round2(rent0),
+      pmiMonthly: pmiMo,
+      horizonMonths: horizon,
+      months: months,
+      series: main.series,
+      breakEvenMonth: main.breakEvenMonth,
+      breakEvenDate: main.breakEvenMonth ? addMonths(start, main.breakEvenMonth - 1) : null,
+      at: main.at,
+      equivalentRent: equivalentRent,
+      firstMonth: firstMonth
+    };
+  }
+
   return {
     MAX_MONTHS: MAX_MONTHS,
     round2: round2, round4: round4, cents: cents, dollars: dollars, num: num, clamp: clampNum,
@@ -942,6 +1495,13 @@
     summarizeDebts: summarizeDebts,
     analyzeConsolidation: analyzeConsolidation,
     analyzeBuydown: analyzeBuydown,
+    analyzeBuyVsRent: analyzeBuyVsRent,
+    analyzeCostOfWaiting: analyzeCostOfWaiting,
+    analyzeBidOverAsk: analyzeBidOverAsk,
+    affordability: affordability,
+    analyzeTempBuydown: analyzeTempBuydown,
+    analyzeConcessionVsPriceCut: analyzeConcessionVsPriceCut,
+    analyzeArmVsFixed: analyzeArmVsFixed,
     currentLoanFromOrigination: currentLoanFromOrigination
   };
 });

@@ -8,7 +8,7 @@ stylesheet, one HTML page. Drop it on any static host, or paste it into a CMS.
 
 ---
 
-## The five tools
+## The eight tools
 
 ### 1. Payment & Schedule
 The full picture of a purchase loan.
@@ -120,7 +120,36 @@ The include/exclude switch drives the whole tab, not just this card: the new loa
 payment, APR and break-even all move with it. The three-column comparison always shows both
 paths regardless, so the choice stays visible.
 
-### 5. Compare Loans
+### 5. Buy vs Rent
+The flagship advisor tool (the analysis MBS Highway and the NYT calculator are known for),
+done honestly: both paths start with the same cash — the buyer puts it into the home, the
+renter invests it — and whichever path is cheaper in a given month invests the difference.
+- **Net-wealth curves** for both paths over 30 years, after selling costs
+- **Break-even point** — the month buying pulls ahead
+- **Equivalent rent** — the rent at which the two paths tie at your horizon; the honest
+  monthly price tag of the home
+- **Every cost counted**: tax, insurance, maintenance, HOA, PMI (with HPA cancellation),
+  buying and selling costs, rent growth, the renter's returned deposit
+- **No tax-deduction thumb on the scale** — most filers take the standard deduction, so
+  modeling one would flatter buying
+
+### 6. Buy Now vs Wait
+The MBS Highway-style "Cost of Waiting" analysis:
+- **Price, payment and down payment if you wait**, at your appreciation and future-rate
+  assumptions — including the case where a rate drop wins the month-to-month
+- **Equity missed** — appreciation plus amortization a buy-now buyer collects while you wait
+- **Bid over asking** — months for appreciation to absorb the premium, and what the premium
+  really adds to the monthly payment
+- **Affordability** — the price where your ratios hit the classic 28/36 DTI caps
+
+### 7. Rate Strategies
+- **Temporary buydowns** (3-2-1, 2-1, 1-0): year-by-year payments and the true subsidy cost
+- **The same seller credit, three ways**: price cut vs. permanent points vs. temporary
+  buydown, judged on interest actually paid over your stay
+- **ARM vs. fixed** on your own adjustment assumption, with the crossover month where the
+  ARM's early savings are gone — and a caveat that caps, not hopes, bound the risk
+
+### 8. Compare Loans
 Three scenarios side by side — 15 vs. 30 year, two lenders, or the same loan with and
 without extra payments. Balance curves on one axis and a head-to-head metrics table.
 

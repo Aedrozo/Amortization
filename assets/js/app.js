@@ -164,6 +164,7 @@
     curMode: 'balance',
     oneTime: [],
     debts: [],
+    bdType: '21',
     sideTouched: false,
     activeTab: 'payment'
   };
@@ -232,7 +233,10 @@
     'no-principal': 'Enter a loan amount greater than zero to see a schedule.',
     'no-term': 'Enter a loan term greater than zero.',
     'negative-amortization': 'That payment is smaller than the first month\'s interest, so the balance would grow instead of shrink. Increase the payment or lower the rate.',
-    'no-payoff': 'These numbers never pay the loan off. Check the rate and payment amount.'
+    'no-payoff': 'These numbers never pay the loan off. Check the rate and payment amount.',
+    'price': 'Enter a home price greater than zero.',
+    'loan': 'Enter a price and down payment that leave a loan (or price) greater than zero.',
+    'inputs': 'Something in these inputs doesn\'t work together. Please review them.'
   };
 
   function showError(containerId, code) {
@@ -1592,6 +1596,579 @@
   }
 
   /* ==================================================================
+   * TAB — Buy vs Rent
+   * ================================================================== */
+  function buyRentConfig() {
+    var price = val('brPrice');
+    var downPct = Math.min(100, Math.max(0, val('brDownPct')));
+    return {
+      price: price,
+      downPayment: price * downPct / 100,
+      rate: val('brRate'),
+      termMonths: parseInt($('brTerm').value, 10),
+      buyClosingPct: val('brBuyClose'),
+      sellClosingPct: val('brSellClose'),
+      taxPct: val('brTaxPct'),
+      insuranceYr: val('brInsurance'),
+      hoaMonthly: val('brHoa'),
+      maintPct: val('brMaint'),
+      pmiRatePct: val('brPmi'),
+      appreciationPct: val('brAppr'),
+      rent: val('brRent'),
+      rentGrowthPct: val('brRentGrowth'),
+      rentersInsMo: val('brRentIns'),
+      investmentReturnPct: val('brInvest'),
+      horizonMonths: Math.round(Math.min(30, Math.max(1, val('brYears') || 7)) * 12),
+      start: F.todayYM()
+    };
+  }
+
+  function renderBuyRentVerdict(r, cfg) {
+    var box = $('brVerdict');
+    var adv = r.at.advantage;
+    var yrs = fmtDuration(r.horizonMonths);
+    var kind, title, text;
+
+    if (adv >= 0) {
+      kind = 'good';
+      title = 'Buying builds more wealth on your timeline';
+      text = 'After ' + yrs + ' — counting every cost of owning, the selling costs, and the renter ' +
+        'investing the down payment at ' + fmtPct(cfg.investmentReturnPct) + ' — buying comes out ' +
+        fmt$(adv) + ' ahead. ' +
+        (r.breakEvenMonth ? 'It pulls ahead after ' + fmtDuration(r.breakEvenMonth) + '. ' : '') +
+        (r.equivalentRent !== null && r.equivalentRent > 0
+          ? 'Renting would only win below about ' + fmt$(r.equivalentRent) + ' a month.'
+          : 'Under these assumptions buying wins at any rent.');
+    } else if (r.breakEvenMonth) {
+      kind = 'warn';
+      title = 'Renting wins for your timeline — buying needs longer';
+      text = 'After ' + yrs + ' the renter ends up ' + fmt$(-adv) + ' ahead, mostly because of the ' +
+        'costs of getting in and out of the home. Buying catches up after ' +
+        fmtDuration(r.breakEvenMonth) + ' — stay that long and the answer flips. It would also ' +
+        'flip if a comparable rental cost more than about ' + fmt$(r.equivalentRent) + ' a month.';
+    } else {
+      kind = 'warn';
+      title = 'Renting builds more wealth under these assumptions';
+      text = 'Renting at ' + fmt$2(cfg.rent) + ' and investing the difference stays ahead for the ' +
+        'full 30 years modeled — your rent sits well under the ' +
+        (r.equivalentRent !== null ? fmt$(r.equivalentRent) + ' ' : '') +
+        'a comparable owned home really costs each month. Higher rent, higher appreciation, or a ' +
+        'lower rate would change the picture.';
+    }
+
+    var ICON = {
+      good: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+      warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3l9 16H3z"/><line x1="12" y1="10" x2="12" y2="14"/><line x1="12" y1="17" x2="12" y2="17"/></svg>'
+    };
+    box.innerHTML = '<div class="verdict is-' + kind + '">' +
+      '<div class="verdict-badge">' + ICON[kind] + '</div>' +
+      '<div><div class="verdict-title">' + title + '</div>' +
+      '<div class="verdict-text">' + text + '</div></div></div>';
+  }
+
+  function renderBuyRent() {
+    var cfg = buyRentConfig();
+    var hint = $('brDownHint');
+    if (hint) hint.textContent = fmt$(cfg.downPayment) + ' down · ' +
+      fmt$(Math.max(0, cfg.price - cfg.downPayment)) + ' loan';
+
+    var r = F.analyzeBuyVsRent(cfg);
+    cache.buyrent = r;
+    if (showError('brError', r.error)) {
+      $('brVerdict').innerHTML = ''; $('brStats').innerHTML = '';
+      return;
+    }
+
+    renderBuyRentVerdict(r, cfg);
+
+    var adv = r.at.advantage;
+    var stats = [
+      {
+        label: adv >= 0 ? 'Buying is ahead by' : 'Renting is ahead by',
+        value: fmt$(Math.abs(adv)),
+        sub: 'After ' + fmtDuration(r.horizonMonths) + ', if you sold then',
+        hero: true, cls: adv >= 0 ? 'is-good' : 'is-warn'
+      },
+      {
+        label: 'Break-even point',
+        value: r.breakEvenMonth ? fmtDuration(r.breakEvenMonth) : 'Beyond 30 yrs',
+        sub: r.breakEvenMonth
+          ? 'Buying pulls ahead around ' + ymLabel(r.breakEvenDate)
+          : 'Renting stays ahead for the full period modeled',
+        cls: r.breakEvenMonth && r.breakEvenMonth <= r.horizonMonths ? 'is-good' : ''
+      },
+      {
+        label: 'Equivalent rent',
+        value: r.equivalentRent !== null ? fmt$(r.equivalentRent) : '—',
+        sub: 'Renting a similar home under this beats buying, over your stay',
+        tip: 'The rent at which both paths end up with the same net wealth at your horizon. It is the honest monthly price tag of this home: below it, the renter who invests wins; above it, the buyer does.'
+      },
+      {
+        label: 'Owning costs today',
+        value: fmt$2(r.firstMonth.ownTotal) + '/mo',
+        sub: 'vs ' + fmt$2(r.firstMonth.rentTotal) + ' renting — every cost counted'
+      },
+      {
+        label: 'Equity when you sell',
+        value: fmt$(r.at.equity),
+        sub: fmt$(r.at.homeValue) + ' home minus ' + fmt$(r.at.balance) + ' still owed'
+      },
+      {
+        label: "Renter's portfolio",
+        value: fmt$(r.at.renterFund),
+        sub: 'Started with your ' + fmt$(r.initialCash) + ' down payment + closing costs',
+        tip: 'The renter is not throwing money away — they are investing the cash a buyer would sink into the purchase, plus any month renting was cheaper.'
+      }
+    ];
+    $('brStats').innerHTML = stats.map(statHTML).join('');
+
+    // --- wealth chart, sampled yearly -------------------------------------
+    var pts = r.series.filter(function (s) { return s.m % 12 === 0; });
+    var startYr = cfg.start.year;
+    var beIdx = r.breakEvenMonth ? Math.round(r.breakEvenMonth / 12) - 1 : null;
+    var moveIdx = Math.round(r.horizonMonths / 12) - 1;
+    C.area($('brChart'), {
+      labels: pts.map(function (s, i) { return startYr + 1 + i; }),
+      series: [
+        { label: 'Buying — net of selling costs', color: cssVar('--c-equity'),
+          data: pts.map(function (s) { return s.buyerNet; }), fill: true },
+        { label: 'Renting & investing', color: cssVar('--c-principal'),
+          data: pts.map(function (s) { return s.renterNet; }) }
+      ],
+      markers: [
+        beIdx !== null && beIdx >= 0 && beIdx < pts.length
+          ? { index: beIdx, label: 'Break-even', color: cssVar('--green-500') } : null,
+        moveIdx >= 0 && moveIdx < pts.length
+          ? { index: moveIdx, label: 'You move', color: cssVar('--amber-500') } : null
+      ].filter(Boolean),
+      height: 320,
+      valueFormat: function (v) { return fmt$(v); },
+      ariaLabel: 'Net wealth of buying versus renting over 30 years'
+    });
+    C.legend($('brLegend'), [
+      { label: 'Buying — equity after selling costs', color: cssVar('--c-equity') },
+      { label: 'Renting — invested portfolio', color: cssVar('--c-principal') }
+    ]);
+
+    $('brNote').innerHTML =
+      '<div class="callout is-info"><svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>' +
+      '<div><strong>How this is judged.</strong> Both sides start with the same ' + fmt$(r.initialCash) +
+      ' — the buyer puts it into the home, the renter invests it at ' + fmtPct(cfg.investmentReturnPct) +
+      '. Whoever has the cheaper month invests the difference too. The buyer’s line is what a sale ' +
+      'would actually net after ' + fmtPct(cfg.sellClosingPct) + ' selling costs; the renter’s includes ' +
+      'their returned deposit. Mortgage-interest tax deductions are not counted — most filers take the ' +
+      'standard deduction — so buying is not being flattered. Results ride on the appreciation and ' +
+      'return assumptions you chose; nobody can promise either.</div></div>';
+
+    // --- monthly cost table ----------------------------------------------
+    var f = r.firstMonth;
+    var ownRows = [
+      ['Principal &amp; interest', f.pi], ['Property tax', f.tax],
+      ['Homeowners insurance', f.insurance], ['HOA dues', f.hoa],
+      ['Maintenance &amp; repairs', f.maintenance], ['Mortgage insurance (PMI)', f.pmi]
+    ].filter(function (x) { return x[1] > 0; });
+    var rentRows = [
+      ['Rent', f.rent], ["Renter's insurance", f.rentersIns]
+    ].filter(function (x) { return x[1] > 0; });
+    var n = Math.max(ownRows.length, rentRows.length);
+    var body = '';
+    for (var i = 0; i < n; i++) {
+      var o = ownRows[i], re = rentRows[i];
+      body += '<tr><td>' + (o ? o[0] : '') + '</td><td class="num">' + (o ? fmt$2(o[1]) : '') +
+        '</td><td>' + (re ? re[0] : '') + '</td><td class="num">' + (re ? fmt$2(re[1]) : '') + '</td></tr>';
+    }
+    $('brMonthlyWrap').innerHTML =
+      '<table class="data"><thead><tr><th>Owning</th><th class="num">Monthly</th>' +
+      '<th>Renting</th><th class="num">Monthly</th></tr></thead><tbody>' + body +
+      '<tr class="is-total"><td><strong>Total to own</strong></td><td class="num"><strong>' + fmt$2(f.ownTotal) +
+      '</strong></td><td><strong>Total to rent</strong></td><td class="num"><strong>' + fmt$2(f.rentTotal) +
+      '</strong></td></tr></tbody></table>';
+
+    // --- horizon table ----------------------------------------------------
+    $('brHorizonTitle').textContent = 'Where you’d stand after ' + fmtDuration(r.horizonMonths);
+    var a = r.at;
+    var hrows = [
+      ['Cash in at the start', fmt$(r.initialCash), fmt$(r.initialCash)],
+      ['Paid out along the way', fmt$(a.cumOwn), fmt$(a.cumRent)],
+      ['Home value / portfolio value', fmt$(a.homeValue), fmt$(a.renterFund)],
+      ['Loan balance still owed', '−' + fmt$(a.balance), '—'],
+      ['Selling costs', '−' + fmt$(a.sellingCost), '—'],
+      ['Side fund / deposit back', fmt$(a.buyerFund), fmt$(a.deposit)]
+    ];
+    $('brHorizonWrap').innerHTML =
+      '<table class="data"><thead><tr><th></th><th class="num">Buying</th><th class="num">Renting</th></tr></thead><tbody>' +
+      hrows.map(function (row) {
+        return '<tr><td><strong>' + row[0] + '</strong></td><td class="num">' + row[1] +
+          '</td><td class="num">' + row[2] + '</td></tr>';
+      }).join('') +
+      '<tr class="is-total"><td><strong>Net position</strong></td><td class="num"><strong>' + fmt$(a.buyerNet) +
+      '</strong></td><td class="num"><strong>' + fmt$(a.renterNet) + '</strong></td></tr></tbody></table>';
+  }
+
+  /* ==================================================================
+   * TAB — Buy Now vs Wait
+   * ================================================================== */
+  function renderCostOfWaiting() {
+    var waitYears = Math.min(10, Math.max(0.5, val('cwWait') || 2));
+    var r = F.analyzeCostOfWaiting({
+      price: val('cwPrice'),
+      downPct: val('cwDownPct'),
+      rateNow: val('cwRate'),
+      rateLater: val('cwRateLater'),
+      termMonths: parseInt($('cwTerm').value, 10),
+      appreciationPct: val('cwAppr'),
+      waitMonths: Math.round(waitYears * 12),
+      start: F.todayYM()
+    });
+    cache.wait = r;
+    if (showError('cwError', r.error)) {
+      $('cwVerdict').innerHTML = ''; $('cwStats').innerHTML = '';
+      return;
+    }
+
+    var wait = fmtDuration(r.waitMonths);
+    var kind, title, text;
+    if (r.paymentIncrease >= 0) {
+      kind = 'warn';
+      title = 'Waiting ' + wait + ' has a price tag here';
+      text = 'At ' + fmtPct(val('cwAppr')) + ' appreciation this home costs ' + fmt$(r.priceIncrease) +
+        ' more by ' + ymLabel(r.laterDate) + ', the payment is ' + fmt$2(r.paymentIncrease) +
+        ' a month higher, and the down payment needs ' + fmt$(r.downIncrease) + ' more cash. ' +
+        'Meanwhile a buyer who started today would already hold ' + fmt$(r.equityMissed) +
+        ' in appreciation and paid-down principal.';
+    } else {
+      kind = 'good';
+      title = 'A rate drop could make waiting cheaper month to month';
+      text = 'If rates really fall to ' + fmtPct(val('cwRateLater')) + ', the later payment is ' +
+        fmt$2(Math.abs(r.paymentIncrease)) + ' lower despite the higher price. The trade: you still ' +
+        'miss ' + fmt$(r.equityMissed) + ' of equity while waiting, and you need ' + fmt$(r.downIncrease) +
+        ' more down. Many buyers split the difference — buy now, refinance if rates drop.';
+    }
+    var ICON = {
+      good: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+      warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3l9 16H3z"/><line x1="12" y1="10" x2="12" y2="14"/><line x1="12" y1="17" x2="12" y2="17"/></svg>'
+    };
+    $('cwVerdict').innerHTML = '<div class="verdict is-' + kind + '">' +
+      '<div class="verdict-badge">' + ICON[kind] + '</div>' +
+      '<div><div class="verdict-title">' + title + '</div>' +
+      '<div class="verdict-text">' + text + '</div></div></div>';
+
+    var stats = [
+      {
+        label: 'Equity missed by waiting', value: fmt$(r.equityMissed),
+        sub: fmt$(r.appreciationGain) + ' appreciation + ' + fmt$(r.amortizationGain) + ' principal paid down',
+        hero: true, cls: 'is-warn'
+      },
+      {
+        label: 'Price if you wait', value: fmt$(r.priceLater),
+        sub: '+' + fmt$(r.priceIncrease) + ' by ' + ymLabel(r.laterDate)
+      },
+      {
+        label: 'Payment now vs later', value: fmt$2(r.paymentNow),
+        sub: 'Later: ' + fmt$2(r.paymentLater) + ' (' + (r.paymentIncrease >= 0 ? '+' : '−') +
+          fmt$2(Math.abs(r.paymentIncrease)) + '/mo)',
+        cls: r.paymentIncrease > 0 ? 'is-warn' : 'is-good'
+      },
+      {
+        label: 'Extra down payment needed', value: fmt$(r.downIncrease),
+        sub: fmt$(r.downLater) + ' instead of ' + fmt$(r.downNow)
+      },
+      {
+        label: 'Payment gap over the whole term',
+        value: (r.lifetimePaymentCost >= 0 ? '' : '−') + fmt$(Math.abs(r.lifetimePaymentCost)),
+        sub: 'The monthly difference, carried across every payment',
+        cls: r.lifetimePaymentCost > 0 ? 'is-warn' : 'is-good'
+      }
+    ];
+    $('cwStats').innerHTML = stats.map(statHTML).join('');
+
+    var pts = r.series;
+    var step = Math.max(1, Math.floor(pts.length / 60));
+    var sampled = pts.filter(function (s, i) { return i % step === 0 || i === pts.length - 1; });
+    C.area($('cwChart'), {
+      labels: sampled.map(function (s) {
+        var ym = F.addMonths(r.buyDate, s.m);
+        return F.MONTH_NAMES[ym.month] + " '" + String(ym.year).slice(2);
+      }),
+      series: [
+        { label: 'Home value', color: cssVar('--c-principal'), data: sampled.map(function (s) { return s.homeValue; }) },
+        { label: 'Your equity if you buy now', color: cssVar('--c-equity'), data: sampled.map(function (s) { return s.equity; }), fill: true }
+      ],
+      height: 280,
+      valueFormat: function (v) { return fmt$(v); },
+      ariaLabel: 'Equity built during the waiting period'
+    });
+    C.legend($('cwLegend'), [
+      { label: 'Home value', color: cssVar('--c-principal') },
+      { label: 'Equity you’d already have (down payment + growth + principal)', color: cssVar('--c-equity') }
+    ]);
+  }
+
+  function renderBidOverAsk() {
+    var r = F.analyzeBidOverAsk({
+      askingPrice: val('boAsk'),
+      bidPrice: val('boBid'),
+      appreciationPct: val('cwAppr'),
+      rate: val('cwRate'),
+      termMonths: parseInt($('cwTerm').value, 10),
+      downPct: val('cwDownPct')
+    });
+    cache.bid = r;
+    if (r.error) { $('boStats').innerHTML = ''; $('boChart').innerHTML = ''; $('boLegend').innerHTML = ''; return; }
+
+    var stats = [
+      {
+        label: 'Premium over asking', value: fmt$(r.premium),
+        sub: fmt$(r.premiumCash) + ' more cash down + ' + fmt$(r.premiumFinanced) + ' financed'
+      },
+      {
+        label: 'Added to the payment', value: fmt$2(r.paymentExtra) + '/mo',
+        sub: 'About ' + fmt$2(r.paymentExtraDaily) + ' a day for the winning bid'
+      },
+      {
+        label: 'Value catches your bid',
+        value: r.recoupMonth === 0 ? 'Immediately'
+          : r.recoupMonth !== null ? fmtDuration(r.recoupMonth) : 'Not in 5 yrs',
+        sub: r.recoupMonth !== null
+          ? 'Appreciation absorbs the premium — after that it’s equity'
+          : 'At this appreciation the premium stays underwater',
+        cls: r.recoupMonth !== null && r.recoupMonth <= 24 ? 'is-good' : r.recoupMonth === null ? 'is-warn' : ''
+      },
+      {
+        label: 'Equity in 5 years', value: fmt$(r.equityIn5),
+        sub: fmt$(r.valueIn5) + ' projected value vs your ' + fmt$(val('boBid')) + ' bid',
+        cls: r.equityIn5 > 0 ? 'is-good' : 'is-warn'
+      }
+    ];
+    $('boStats').innerHTML = stats.map(statHTML).join('');
+
+    var pts = r.series.filter(function (s) { return s.m % 3 === 0; });
+    var bid = val('boBid');
+    var rc = r.recoupMonth !== null ? Math.round(r.recoupMonth / 3) : null;
+    C.area($('boChart'), {
+      labels: pts.map(function (s) { return s.m === 0 ? 'Now' : (s.m % 12 === 0 ? (s.m / 12) + ' yr' : ''); }),
+      series: [
+        { label: 'Projected home value', color: cssVar('--c-equity'), data: pts.map(function (s) { return s.homeValue; }), fill: true },
+        { label: 'Your total bid', color: cssVar('--c-pmi'), data: pts.map(function () { return bid; }), dashed: true }
+      ],
+      markers: rc !== null && rc > 0 && rc < pts.length
+        ? [{ index: rc, label: 'Bid recouped', color: cssVar('--green-500') }] : [],
+      height: 240,
+      valueFormat: function (v) { return fmt$(v); },
+      ariaLabel: 'Projected home value against the bid amount'
+    });
+    C.legend($('boLegend'), [
+      { label: 'Projected value', color: cssVar('--c-equity') },
+      { label: 'Your bid', color: cssVar('--c-pmi') }
+    ]);
+  }
+
+  function renderAffordability() {
+    var a = F.affordability({
+      annualIncome: val('afIncome'),
+      monthlyDebts: val('afDebts'),
+      downPayment: val('afDown'),
+      rate: val('cwRate'),
+      termMonths: parseInt($('cwTerm').value, 10),
+      taxPct: val('afTax'),
+      insuranceYr: val('afIns'),
+      hoaMonthly: 0
+    });
+    cache.afford = a;
+    var box = $('afResult');
+    if (a.error === 'income') {
+      box.innerHTML = '<p class="empty-state mb-0">Enter a household income to size the budget.</p>';
+      return;
+    }
+    if (a.error === 'budget') {
+      box.innerHTML = '<div class="callout is-warn"><svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3l9 16H3z"/><line x1="12" y1="10" x2="12" y2="14"/><line x1="12" y1="17" x2="12" y2="17"/></svg>' +
+        '<div>Monthly debts use up the whole 36% back-end cap before any housing payment fits. ' +
+        'Paying debts down — or consolidating them — is the first move here.</div></div>';
+      return;
+    }
+    box.innerHTML =
+      '<div class="stat-grid">' + [
+        {
+          label: 'Home price in reach', value: fmt$(a.maxPrice),
+          sub: fmt$(a.loanAmount) + ' loan after your ' + fmt$(val('afDown')) + ' down',
+          hero: true, cls: 'is-good'
+        },
+        {
+          label: 'Housing budget', value: fmt$2(a.housingBudget) + '/mo',
+          sub: fmt$2(a.payment) + ' P&amp;I + taxes and insurance'
+        },
+        {
+          label: 'Your ratios at that price', value: fmtPct(a.frontRatio, 0) + ' / ' + fmtPct(a.backRatio, 0),
+          sub: 'Housing / total debt, against the 28 / 36 caps',
+          tip: 'The front-end ratio is the housing payment as a share of gross monthly income; the back-end adds every other debt payment. 28/36 is the classic conservative standard — many programs allow more.'
+        }
+      ].map(statHTML).join('') + '</div>' +
+      '<div class="hint mt-16">Planning figure only — an actual approval weighs credit, reserves, and the loan program. ' +
+      'Get a real pre-approval before shopping.</div>';
+  }
+
+  /* ==================================================================
+   * TAB — Rate Strategies
+   * ================================================================== */
+  var BD_STEPS = { '321': [3, 2, 1], '21': [2, 1], '10': [1] };
+  var BD_LABEL = { '321': '3-2-1', '21': '2-1', '10': '1-0' };
+
+  function renderStrategy() {
+    var price = val('stPrice');
+    var downPct = Math.min(100, Math.max(0, val('stDownPct')));
+    var loan = Math.max(0, price - price * downPct / 100);
+    var hint = $('stLoanHint');
+    if (hint) hint.textContent = fmt$(loan) + ' loan';
+    var rate = val('stRate');
+    var termM = parseInt($('stTerm').value, 10);
+    var horizonM = Math.round(Math.min(30, Math.max(1, val('stYears') || 7)) * 12);
+    var steps = BD_STEPS[state.bdType] || BD_STEPS['21'];
+
+    var tb = F.analyzeTempBuydown({ loanAmount: loan, rate: rate, termMonths: termM, steps: steps });
+    if (showError('stError', tb.error)) {
+      $('tbTableWrap').innerHTML = ''; $('tbNote').innerHTML = '';
+      $('ccTableWrap').innerHTML = ''; $('ccNote').innerHTML = '';
+      $('armStats').innerHTML = ''; $('armChart').innerHTML = ''; $('armLegend').innerHTML = ''; $('armNote').innerHTML = '';
+      return;
+    }
+
+    // --- temporary buydown -----------------------------------------------
+    $('tbTitle').textContent = 'Temporary buydown (' + BD_LABEL[state.bdType] + ')';
+    var tbBody = tb.years.map(function (y) {
+      return '<tr><td><strong>Year ' + y.year + '</strong></td><td class="num">' + fmtPct(y.rate, 3) +
+        '</td><td class="num">' + fmt$2(y.payment) + '</td><td class="num">' + fmt$2(y.monthlySavings) +
+        '</td><td class="num">' + fmt$(y.annualSavings) + '</td></tr>';
+    }).join('');
+    tbBody += '<tr><td><strong>Year ' + (tb.afterYears + 1) + '+</strong></td><td class="num">' +
+      fmtPct(rate, 3) + '</td><td class="num">' + fmt$2(tb.fullPayment) +
+      '</td><td class="num">—</td><td class="num">—</td></tr>';
+    $('tbTableWrap').innerHTML =
+      '<table class="data"><thead><tr><th></th><th class="num">Rate you pay</th><th class="num">Monthly payment</th>' +
+      '<th class="num">Saved / mo</th><th class="num">Subsidy used</th></tr></thead><tbody>' + tbBody +
+      '<tr class="is-total"><td colspan="4"><strong>Cost of the buydown (usually seller-paid)</strong></td>' +
+      '<td class="num"><strong>' + fmt$(tb.totalCost) + '</strong></td></tr></tbody></table>';
+    $('tbNote').innerHTML =
+      '<div class="callout is-info"><svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>' +
+      '<div>The note rate never actually changes — a ' + fmt$(tb.totalCost) + ' escrow account tops up each ' +
+      'payment while the buydown lasts, and you must qualify at the full ' + fmtPct(rate, 3) + ' payment. ' +
+      'If you refinance before it runs out, the unused balance is typically credited against your payoff.</div></div>';
+
+    // --- concession three ways --------------------------------------------
+    var cc = F.analyzeConcessionVsPriceCut({
+      price: price, concession: val('stConcession'), downPct: downPct,
+      rate: rate, boughtRate: val('stBoughtRate'), termMonths: termM,
+      horizonMonths: horizonM, tempSteps: steps
+    });
+    if (cc.error) {
+      $('ccTableWrap').innerHTML = '<p class="empty-state mb-0">Enter a seller credit to compare the options.</p>';
+      $('ccNote').innerHTML = '';
+    } else {
+      var tempNetInterest = cc.temporary.interestAtHorizon - cc.temporary.subsidyUsedAtHorizon;
+      var ccRows = [
+        ['Loan amount', fmt$(cc.priceCut.loanAmount), fmt$(cc.permanent.loanAmount), fmt$(cc.temporary.loanAmount)],
+        ['Rate you pay', fmtPct(rate, 3), fmtPct(cc.permanent.rate, 3),
+          fmtPct(tb.years[0].rate, 3) + ' → ' + fmtPct(rate, 3)],
+        ['Payment, year 1', fmt$2(cc.priceCut.payment), fmt$2(cc.permanent.payment), fmt$2(tb.years[0].payment)],
+        ['Payment after the buydown', fmt$2(cc.priceCut.payment), fmt$2(cc.permanent.payment), fmt$2(cc.temporary.fullPayment)],
+        ['Interest you pay over ' + fmtDuration(cc.horizonMonths),
+          fmt$(cc.priceCut.interestAtHorizon), fmt$(cc.permanent.interestAtHorizon), fmt$(tempNetInterest)],
+        ['Instant equity from the lower price', fmt$(cc.priceCut.instantEquity), '—', '—'],
+        ['Credit left unspent', '—', '—',
+          cc.temporary.leftoverVsConcession > 0 ? fmt$(cc.temporary.leftoverVsConcession) : '—']
+      ];
+      $('ccTableWrap').innerHTML =
+        '<table class="data"><thead><tr><th></th><th class="num">Price cut</th><th class="num">Permanent buydown</th>' +
+        '<th class="num">Temporary ' + BD_LABEL[state.bdType] + '</th></tr></thead><tbody>' +
+        ccRows.map(function (row) {
+          return '<tr><td><strong>' + row[0] + '</strong></td><td class="num">' + row[1] +
+            '</td><td class="num">' + row[2] + '</td><td class="num">' + row[3] + '</td></tr>';
+        }).join('') + '</tbody></table>';
+
+      var options = [
+        { name: 'the price cut', v: cc.priceCut.interestAtHorizon },
+        { name: 'the permanent buydown', v: cc.permanent.interestAtHorizon },
+        { name: 'the temporary buydown', v: tempNetInterest }
+      ].sort(function (a, b) { return a.v - b.v; });
+      $('ccNote').innerHTML =
+        '<div class="callout is-good"><svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+        '<div>Measured on interest actually paid over ' + fmtDuration(cc.horizonMonths) + ', <strong>' +
+        options[0].name + '</strong> wins here, by ' + fmt$(options[1].v - options[0].v) + ' over the runner-up. ' +
+        'The longer you keep the loan, the more a permanent rate cut compounds; the shorter your stay, ' +
+        'the better the upfront options look. A price cut also lowers what the county taxes forever.</div></div>';
+    }
+
+    // --- ARM vs fixed -----------------------------------------------------
+    var arm = F.analyzeArmVsFixed({
+      loanAmount: loan, termMonths: termM, fixedRate: rate,
+      armRate: val('stArmRate'), armFixedMonths: parseInt($('stArmFixed').value, 10),
+      armAdjustedRate: val('stArmAdj'), horizonMonths: Math.max(horizonM, parseInt($('stArmFixed').value, 10) + 60)
+    });
+    cache.arm = arm;
+    if (!arm.error) {
+      var armYears = arm.armFixedMonths / 12;
+      var armStats = [
+        {
+          label: 'ARM payment, first ' + armYears + ' yrs', value: fmt$2(arm.paymentArmIntro),
+          sub: fmt$2(arm.paymentFixed - arm.paymentArmIntro) + '/mo under the fixed payment',
+          hero: true, cls: 'is-good'
+        },
+        {
+          label: 'Payment if it adjusts as you expect', value: fmt$2(arm.paymentArmAfter),
+          sub: (arm.paymentJump >= 0 ? '+' : '−') + fmt$2(Math.abs(arm.paymentJump)) +
+            '/mo starting year ' + (armYears + 1),
+          cls: arm.paymentJump > 0 ? 'is-warn' : 'is-good'
+        },
+        {
+          label: 'Interest saved by ' + fmtDuration(horizonM),
+          value: fmt$(Math.abs(F.round2(
+            (arm.series[Math.min(horizonM, arm.series.length) - 1].fixedInterest) -
+            (arm.series[Math.min(horizonM, arm.series.length) - 1].armInterest)))),
+          sub: (arm.series[Math.min(horizonM, arm.series.length) - 1].fixedInterest >=
+            arm.series[Math.min(horizonM, arm.series.length) - 1].armInterest
+            ? 'In the ARM’s favor at your horizon' : 'In the fixed loan’s favor at your horizon'),
+          cls: arm.series[Math.min(horizonM, arm.series.length) - 1].fixedInterest >=
+            arm.series[Math.min(horizonM, arm.series.length) - 1].armInterest ? 'is-good' : 'is-bad'
+        },
+        {
+          label: 'Early savings run out', value: arm.crossoverMonth ? fmtDuration(arm.crossoverMonth) : 'Not projected',
+          sub: arm.crossoverMonth
+            ? 'Past this point the fixed loan has cost less in total interest'
+            : 'Under your assumption the ARM stays ahead in the window shown',
+          cls: arm.crossoverMonth && arm.crossoverMonth < horizonM ? 'is-warn' : ''
+        }
+      ];
+      $('armStats').innerHTML = armStats.map(statHTML).join('');
+
+      var apts = arm.series.filter(function (s) { return s.m % 6 === 0; });
+      var adjIdx = Math.round(arm.armFixedMonths / 6);
+      var crossIdx = arm.crossoverMonth ? Math.round(arm.crossoverMonth / 6) : null;
+      C.area($('armChart'), {
+        labels: apts.map(function (s) { return s.m % 12 === 0 ? (s.m / 12) + ' yr' : ''; }),
+        series: [
+          { label: 'Fixed — interest paid', color: cssVar('--c-interest'), data: apts.map(function (s) { return s.fixedInterest; }) },
+          { label: 'ARM — interest paid', color: cssVar('--c-accel'), data: apts.map(function (s) { return s.armInterest; }) }
+        ],
+        markers: [
+          adjIdx > 0 && adjIdx < apts.length ? { index: adjIdx, label: 'ARM adjusts', color: cssVar('--amber-500') } : null,
+          crossIdx !== null && crossIdx < apts.length ? { index: crossIdx, label: 'Savings gone', color: cssVar('--red-500') } : null
+        ].filter(Boolean),
+        height: 280,
+        valueFormat: function (v) { return fmt$(v); },
+        ariaLabel: 'Cumulative interest, ARM versus fixed'
+      });
+      C.legend($('armLegend'), [
+        { label: 'Fixed-rate loan', color: cssVar('--c-interest') },
+        { label: 'ARM, on your assumption', color: cssVar('--c-accel') }
+      ]);
+      $('armNote').innerHTML =
+        '<div class="callout is-warn"><svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3l9 16H3z"/><line x1="12" y1="10" x2="12" y2="14"/><line x1="12" y1="17" x2="12" y2="17"/></svg>' +
+        '<div>The adjusted rate here is <strong>your assumption</strong>, not a forecast. A real ARM moves with ' +
+        'an index plus a margin, limited by adjustment and lifetime caps — ask for the caps and rerun this ' +
+        'at the worst case before choosing one. ARMs fit people who will sell or refinance inside the fixed period.</div></div>';
+    }
+  }
+
+  /* ==================================================================
    * Recalculation orchestration
    * ================================================================== */
   function recalcAll() {
@@ -1601,6 +2178,11 @@
     try { renderSide(); } catch (e) { console.error('side', e); }
     try { renderRefi(); } catch (e) { console.error('refi', e); }
     try { renderCompare(); } catch (e) { console.error('compare', e); }
+    try { renderBuyRent(); } catch (e) { console.error('buyrent', e); }
+    try { renderCostOfWaiting(); } catch (e) { console.error('wait', e); }
+    try { renderBidOverAsk(); } catch (e) { console.error('bid', e); }
+    try { renderAffordability(); } catch (e) { console.error('afford', e); }
+    try { renderStrategy(); } catch (e) { console.error('strategy', e); }
     writeUrl();
     // Adding a debt or revealing PMI fields changes how far the column scrolls.
     if (typeof sizeStickyPanels === 'function') sizeStickyPanels();
@@ -1614,7 +2196,13 @@
     'propertyTax', 'homeInsurance', 'hoaMonthly', 'otherMonthly', 'pmiRate', 'appreciation',
     'escrowInflation', 'loanCosts', 'extraMonthly', 'extraStartMonth', 'extraAnnual', 'sidePayment',
     'curBalance', 'curRate', 'curRemaining', 'newRate', 'closingCosts', 'points', 'cashOut',
-    'yearsInHome', 'investReturn'];
+    'yearsInHome', 'investReturn',
+    'brPrice', 'brDownPct', 'brRate', 'brBuyClose', 'brSellClose', 'brTaxPct', 'brInsurance',
+    'brHoa', 'brMaint', 'brPmi', 'brAppr', 'brRent', 'brRentGrowth', 'brRentIns', 'brYears', 'brInvest',
+    'cwPrice', 'cwDownPct', 'cwRate', 'cwRateLater', 'cwAppr', 'cwWait',
+    'boAsk', 'boBid', 'afIncome', 'afDebts', 'afDown', 'afTax', 'afIns',
+    'stPrice', 'stDownPct', 'stRate', 'stConcession', 'stBoughtRate',
+    'stArmRate', 'stArmAdj', 'stYears'];
 
   /**
    * Fields that must never be comma-grouped when a share link is restored.
@@ -1623,7 +2211,11 @@
    */
   var PLAIN_FIELDS = ['startYear', 'origStartYear', 'interestRate', 'curRate', 'newRate',
     'pmiRate', 'points', 'appreciation', 'escrowInflation', 'investReturn',
-    'curRemaining', 'yearsInHome', 'extraStartMonth'];
+    'curRemaining', 'yearsInHome', 'extraStartMonth',
+    'brDownPct', 'brRate', 'brBuyClose', 'brSellClose', 'brTaxPct', 'brMaint', 'brPmi',
+    'brAppr', 'brRentGrowth', 'brInvest', 'brYears',
+    'cwDownPct', 'cwRate', 'cwRateLater', 'cwAppr', 'cwWait', 'afTax',
+    'stDownPct', 'stRate', 'stBoughtRate', 'stArmRate', 'stArmAdj', 'stYears'];
 
   function writeUrl() {
     var p = new URLSearchParams();
@@ -1634,6 +2226,11 @@
     p.set('term', $('loanTerm').value);
     p.set('sm', $('startMonth').value);
     p.set('nt', $('newTerm').value);
+    p.set('brt', $('brTerm').value);
+    p.set('cwt', $('cwTerm').value);
+    p.set('stt', $('stTerm').value);
+    p.set('saf', $('stArmFixed').value);
+    p.set('bdt', state.bdType);
     p.set('pmi', $('pmiEnabled').getAttribute('aria-checked'));
     p.set('bw', $('biweekly').getAttribute('aria-checked'));
     p.set('roll', $('rollIn').getAttribute('aria-checked'));
@@ -1669,6 +2266,16 @@
     if (p.has('term')) $('loanTerm').value = p.get('term');
     if (p.has('sm')) $('startMonth').value = p.get('sm');
     if (p.has('nt')) $('newTerm').value = p.get('nt');
+    if (p.has('brt')) $('brTerm').value = p.get('brt');
+    if (p.has('cwt')) $('cwTerm').value = p.get('cwt');
+    if (p.has('stt')) $('stTerm').value = p.get('stt');
+    if (p.has('saf')) $('stArmFixed').value = p.get('saf');
+    if (p.has('bdt') && (p.get('bdt') in { '321': 1, '21': 1, '10': 1 })) {
+      state.bdType = p.get('bdt');
+      $$('[data-bdtype]').forEach(function (b) {
+        b.setAttribute('aria-pressed', b.dataset.bdtype === state.bdType ? 'true' : 'false');
+      });
+    }
     if (p.has('tm')) {
       state.taxMode = p.get('tm');
       $$('[data-taxmode]').forEach(function (b) {
@@ -1695,11 +2302,17 @@
         return { amount: parseNum(parts[0]), year: parseInt(parts[1], 10), month: parseInt(parts[2], 10) };
       }).filter(function (o) { return isFinite(o.year); });
       renderOneTimeList();
-    renderDebtList();
     }
     if (p.has('sidePayment')) state.sideTouched = true;
     if (p.has('customTermMonths')) $('customTermMonths').value = p.get('customTermMonths');
     $('customTermField').hidden = $('loanTerm').value !== 'custom';
+    // Park each slider on its restored value.
+    [['downPaymentPct', 'downPaymentRange', 50], ['extraMonthly', 'extraMonthlyRange', 2000],
+      ['yearsInHome', 'yearsInHomeRange', 30], ['brYears', 'brYearsRange', 30],
+      ['cwWait', 'cwWaitRange', 5], ['stYears', 'stYearsRange', 30]].forEach(function (pair) {
+        var txt = $(pair[0]), rng = $(pair[1]);
+        if (txt && rng) rng.value = Math.min(pair[2], Math.max(parseFloat(rng.min) || 0, parseNum(txt.value)));
+      });
     return applied;
   }
 
@@ -1797,6 +2410,7 @@
         btn.setAttribute('aria-pressed', 'true');
       }
 
+      if (btn.dataset.bdtype) { state.bdType = btn.dataset.bdtype; renderStrategy(); writeUrl(); return; }
       if (btn.dataset.schedview) { state.schedView = btn.dataset.schedview; renderSchedule(cache.base); return; }
       if (btn.dataset.accelview) { state.accelView = btn.dataset.accelview; $('accelScheduleWrap').innerHTML = scheduleTableHTML(cache.compare.accelerated, state.accelView); return; }
       if (btn.dataset.sideview) { state.sideView = btn.dataset.sideview; renderSideTable(cache.side.base, cache.side.accel); return; }
@@ -1851,6 +2465,17 @@
       recalcSoon();
     });
 
+    // New-tab sliders: text field and range stay in step.
+    [['brYears', 'brYearsRange', 30], ['cwWait', 'cwWaitRange', 5], ['stYears', 'stYearsRange', 30]]
+      .forEach(function (pair) {
+        var txt = $(pair[0]), rng = $(pair[1]);
+        if (!txt || !rng) return;
+        rng.addEventListener('input', function () { txt.value = this.value; recalcSoon(); });
+        txt.addEventListener('input', function () {
+          rng.value = Math.min(pair[2], Math.max(1, parseNum(this.value)));
+        });
+      });
+
     $('sidePayment').addEventListener('input', function () { state.sideTouched = true; recalcSoon(); });
 
     $('loanTerm').addEventListener('change', function () {
@@ -1871,7 +2496,10 @@
     // Currency fields get comma formatting on blur.
     ['homePrice', 'downPayment', 'loanAmount', 'propertyTax', 'homeInsurance', 'hoaMonthly',
       'otherMonthly', 'extraMonthly', 'extraAnnual', 'sidePayment', 'curBalance', 'origAmount',
-      'closingCosts', 'cashOut', 'curPaymentOverride'].forEach(function (id) {
+      'closingCosts', 'cashOut', 'curPaymentOverride',
+      'brPrice', 'brInsurance', 'brHoa', 'brRent', 'brRentIns',
+      'cwPrice', 'boAsk', 'boBid', 'afIncome', 'afDebts', 'afDown', 'afIns',
+      'stPrice', 'stConcession'].forEach(function (id) {
         var elx = $(id);
         if (elx) attachCurrencyFormatting(elx);
       });

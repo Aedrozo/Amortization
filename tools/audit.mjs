@@ -22,6 +22,9 @@ const TABS = [
   ['#tab-extra', 'Extra Payments'],
   ['#tab-side', 'Side-by-Side'],
   ['#tab-refi', 'Refinance'],
+  ['#tab-buyrent', 'Buy vs Rent'],
+  ['#tab-wait', 'Buy Now vs Wait'],
+  ['#tab-strategy', 'Rate Strategies'],
   ['#tab-compare', 'Compare Loans']
 ];
 
