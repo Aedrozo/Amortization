@@ -1119,20 +1119,99 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
 /* ==================================================================
    19. Print
    ================================================================== */
+/* ==================================================================
+   Print — "Cyan Edge" client report
+   A branded gradient stripe runs down the left of every page, the report
+   header carries the lockup and preparer, stats print as tinted tiles
+   with gradient hero cards, and a licensing strip repeats per page.
+   ================================================================== */
 @media print {
+  @page { margin: 0.45in 0.5in 0.6in 0.32in; }
+
   :root { --bg: #fff; --surface: #fff; --surface-2: #fff; --surface-3: #f3f5f7; }
-  body { background: #fff; font-size: 11px; }
-  .site-header, .tabs, .hero-sub, .header-actions, .cta-band,
+  body {
+    background: #fff; font-size: 11px;
+    padding-left: 0.3in;   /* clears the brand stripe */
+  }
+
+  /* The brand stripe — position:fixed repeats on every printed page. */
+  body::before {
+    content: ""; position: fixed; top: 0; bottom: 0; left: 0;
+    width: 0.16in; border-radius: 3px;
+    background: linear-gradient(180deg, #2bb3e8 0%, #0b2a3c 100%) !important;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+
+  /* Screen chrome that has no business on paper. */
+  .site-header, .tabs, .hero, .header-actions, .cta-band,
   .btn, .icon-btn, .no-print, .chart-tip { display: none !important; }
   .tab-panel[hidden] { display: none !important; }
+
+  /* -- report header ------------------------------------------------ */
+  .print-head {
+    display: flex !important; align-items: flex-end; justify-content: space-between;
+    gap: 20px; padding: 0 0 14px; margin-bottom: 18px;
+  }
+  .print-head svg { height: 54px; width: auto; color: var(--brand-ink); }
+  .print-head-meta { text-align: right; }
+  .print-title { font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: #0b2a3c; }
+  .print-sub { font-size: 9.5px; margin-top: 3px; color: #0f75a3; font-weight: 600; }
+  .print-date { font-size: 9.5px; margin-top: 1px; color: #48607a; }
+
+  /* -- running footer ----------------------------------------------- */
+  .print-foot {
+    display: block !important; position: fixed; bottom: 0; left: 0.3in; right: 0;
+    font-size: 8px; letter-spacing: .02em; padding: 6px 0 0;
+    text-align: center; color: #0f75a3 !important;
+  }
+
+  /* -- cards, stats, verdicts --------------------------------------- */
   .card { break-inside: avoid; box-shadow: none; border-color: #d0d7de; }
+  .verdict, .callout, .verdict-badge, .stat-pill, .delta-pill {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .verdict { break-inside: avoid; }
   .layout { grid-template-columns: 1fr; gap: 14px; }
+
+  .stat {
+    background: #eef9fe !important; border-color: #c9ecfb !important;
+    border-radius: 10px !important;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .stat.is-hero { background: linear-gradient(135deg, #2bb3e8, #0f75a3) !important; border: 0 !important; }
+  .stat.is-hero .stat-value, .stat.is-hero .stat-label, .stat.is-hero .stat-sub { color: #fff !important; }
+  .stat-value { color: #0b2a3c; }
+
+  .card-head { border-bottom: 0 !important; }
+  .card-head h2 { color: #0b2a3c; }
+  .card-head h2::after {
+    content: ""; display: block; width: 46px; height: 3px;
+    background: #2bb3e8; margin-top: 4px; border-radius: 2px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+
+  /* -- tables & charts ----------------------------------------------- */
   .table-scroll.capped { max-height: none; overflow: visible; }
   table.data { font-size: 9.5px; }
   table.data th, table.data td { padding: 4px 6px; }
-  table.data thead th { position: static; }
+  table.data thead th {
+    position: static;
+    background: #eef9fe !important; color: #0b2a3c !important;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
   .compare-grid { grid-template-columns: 1fr 1fr; }
+  .chart-box svg { max-height: 250px; }
+
+  /* -- legal footer, compact but complete ---------------------------- */
+  .site-footer { margin-top: 26px; }
+  .disclaimer { font-size: 6.8px !important; line-height: 1.45 !important;
+    column-count: 2; column-gap: 18px; }
+  .disclaimer p { break-inside: avoid; }
+  .footer-brand svg { height: 34px !important; }
+  .eho { break-inside: avoid; }
+
   .print-only { display: block !important; }
   a[href]::after { content: ""; }
 }
 .print-only { display: none; }
+.print-head, .print-foot { display: none; }

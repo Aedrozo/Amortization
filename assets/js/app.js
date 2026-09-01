@@ -2794,6 +2794,7 @@
     window.addEventListener('resize', schedule);
     document.addEventListener('click', function (e) {
       if (e.target.closest && e.target.closest('.tab')) schedule();
+      if (e.target.closest && e.target.closest('.tab')) refreshPrintChrome();
     });
     $$('.sticky-col').forEach(function (col) {
       col.addEventListener('scroll', function () { updateColumnFades(col); }, { passive: true });
@@ -2862,6 +2863,56 @@
   }
 
   /* ==================================================================
+   * Print report chrome
+   *
+   * The printed page carries a branded header (lockup, preparer, date,
+   * which tool is shown) and a licensing strip on every sheet, driven
+   * from CONFIG so they can never drift from the site's own disclosures.
+   * Dark mode flips to the light palette for the duration of the print —
+   * charts bake their colours into the SVG, so they re-render too.
+   * ================================================================== */
+  function refreshPrintChrome() {
+    var tab = document.querySelector('.tab[aria-selected="true"]');
+    var tool = tab ? tab.textContent.trim() : '';
+    var title = $('printTitle');
+    if (title) title.textContent = tool ? 'Mortgage Analysis — ' + tool : 'Mortgage Analysis';
+
+    var by = $('printPreparedBy');
+    if (by) by.textContent = 'Prepared by ' + CONFIG.loanOfficer + ' · NMLS #' + CONFIG.loanOfficerNmls +
+      ' · Gem Home Team × NEO Home Loans';
+
+    var date = $('printDate');
+    if (date) date.textContent = new Date().toLocaleDateString('en-US',
+      { year: 'numeric', month: 'long', day: 'numeric' });
+
+    var foot = $('printFoot');
+    if (foot) foot.textContent = CONFIG.loanOfficer + ' · NMLS #' + CONFIG.loanOfficerNmls +
+      ' · ' + String(CONFIG.statesLicensed || '').replace(/\.$/, '') + ' · ' + CONFIG.company +
+      ', NMLS #' + CONFIG.companyNmls + ' · Equal Housing Lender';
+  }
+
+  function initPrint() {
+    refreshPrintChrome();
+
+    var wasDark = false;
+    window.addEventListener('beforeprint', function () {
+      refreshPrintChrome();
+      if (document.documentElement.getAttribute('data-theme') === 'dark') {
+        wasDark = true;
+        applyTheme('light');
+        recalcAll();
+      }
+    });
+    window.addEventListener('afterprint', function () {
+      if (wasDark) {
+        wasDark = false;
+        applyTheme('dark');
+        recalcAll();
+      }
+    });
+  }
+
+  /* ==================================================================
    * Boot
    * ================================================================== */
   function init() {
@@ -2873,6 +2924,7 @@
     initInputs();
     initExports();
     initBranding();
+    initPrint();
     initStickyPanels();
     initTooltips();
     renderScenarioInputs();

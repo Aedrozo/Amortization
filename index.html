@@ -124,6 +124,16 @@
 
 <main class="wrap">
 
+<!-- Print-only report header: hidden on screen, first thing on paper. -->
+<div class="print-head" aria-hidden="true">
+  <svg viewBox="0 0 760 150" role="img" aria-label="Gem Home Team and NEO Home Loans"><use href="#mark-lockup"></use></svg>
+  <div class="print-head-meta">
+    <div class="print-title" id="printTitle">Mortgage Analysis</div>
+    <div class="print-sub" id="printPreparedBy"></div>
+    <div class="print-date" id="printDate"></div>
+  </div>
+</div>
+
 <!-- =============================================================
      TAB 1 — Payment & Schedule
      ============================================================= -->
@@ -1610,6 +1620,9 @@
     </div>
   </div>
 </footer>
+
+<!-- Print-only running footer, repeated on every printed page. -->
+<div class="print-foot" id="printFoot" aria-hidden="true"></div>
 
 <script src="assets/js/finance.js"></script>
 <script src="assets/js/charts.js"></script>

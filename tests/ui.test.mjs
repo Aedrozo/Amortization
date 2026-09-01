@@ -915,6 +915,45 @@ test('new-tab inputs survive a share-link round trip', async () => {
   await page.waitForTimeout(400);
 });
 
+test('printing produces the branded Cyan Edge report chrome', async () => {
+  const p2 = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await p2.goto(BASE, { waitUntil: 'networkidle' });
+  await p2.waitForTimeout(400);
+  await p2.click('#tab-refi');
+  await p2.waitForTimeout(300);
+  await p2.emulateMedia({ media: 'print' });
+  const chrome = await p2.evaluate(() => {
+    const disp = el => getComputedStyle(el).display;
+    return {
+      head: disp(document.querySelector('.print-head')),
+      foot: disp(document.querySelector('.print-foot')),
+      siteHeader: disp(document.querySelector('.site-header')),
+      tabs: disp(document.querySelector('.tabs')),
+      sidebar: disp(document.querySelector('#panel-refi .sticky-col')),
+      title: document.getElementById('printTitle').textContent,
+      preparedBy: document.getElementById('printPreparedBy').textContent,
+      footText: document.getElementById('printFoot').textContent,
+      lockups: document.querySelectorAll('.print-head svg use').length
+    };
+  });
+  assert.equal(chrome.head, 'flex', 'report header shows in print');
+  assert.equal(chrome.foot, 'block', 'running footer shows in print');
+  assert.equal(chrome.siteHeader, 'none', 'screen header hidden');
+  assert.equal(chrome.tabs, 'none', 'tab bar hidden');
+  assert.equal(chrome.sidebar, 'none', 'input column hidden');
+  assert.equal(chrome.lockups, 1, 'brand lockup is in the header');
+  assert.match(chrome.title, /Mortgage Analysis — Refinance/, 'title names the tool shown');
+  assert.match(chrome.preparedBy, /Anthony Edrozo · NMLS #2829800/);
+  assert.match(chrome.footText, /Licensed in California/);
+  assert.match(chrome.footText, /NMLS #330511/);
+  assert.match(chrome.footText, /Equal Housing Lender/);
+  await p2.emulateMedia({ media: 'screen' });
+  const onScreen = await p2.evaluate(() =>
+    getComputedStyle(document.querySelector('.print-head')).display);
+  assert.equal(onScreen, 'none', 'report header never shows on screen');
+  await p2.close();
+});
+
 test('the controls column scrolls independently of the results', async () => {
   const p2 = await browser.newPage({ viewport: { width: 1440, height: 800 } });
   await p2.goto(BASE, { waitUntil: 'networkidle' });
