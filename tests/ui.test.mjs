@@ -931,10 +931,11 @@ test('presenter and client name flow onto the printed report and CSV', async () 
   await p2.click('.presenter-opt[data-lo="megan"]');
   await p2.waitForTimeout(150);
   let by = await p2.textContent('#printPreparedBy');
-  assert.match(by, /Megan/, 'Megan becomes the preparer');
-  assert.ok(!/NMLS/.test(by), 'no NMLS printed while hers is unknown');
-  assert.ok(!(await p2.evaluate(() => document.getElementById('presenterWarn').hidden)),
-    'the popover warns that her details are incomplete');
+  assert.match(by, /Megan Sawamura · NMLS #972639/, 'Megan becomes the preparer, with her NMLS');
+  assert.match(await p2.textContent('#printLoContact'), /\(858\) 567-2233 · Megan@gemhometeam\.com/,
+    'her contact lines print');
+  assert.ok(await p2.evaluate(() => document.getElementById('presenterWarn').hidden),
+    'no missing-details warning — her profile is complete');
 
   await p2.click('.presenter-opt[data-lo="anthony"]');
   await p2.waitForTimeout(150);

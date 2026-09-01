@@ -218,7 +218,7 @@ svg[hidden], [hidden] { display: none !important; }
 .avatar {
   display: inline-flex; align-items: center; justify-content: center;
   width: 24px; height: 24px; border-radius: 50%; flex: 0 0 auto;
-  background-color: var(--navy-800); background-size: cover; background-position: center;
+  background-color: var(--navy-800); background-size: cover; background-position: center 25%;
   color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .02em;
 }
 .avatar-lg { width: 44px; height: 44px; font-size: 16px; }

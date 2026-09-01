@@ -55,17 +55,17 @@
       id: 'anthony',
       name: 'Anthony Edrozo',
       nmls: '2829800',
-      phone: '',                                    // e.g. '(555) 555-1234'
-      email: '',                                    // e.g. 'anthony@example.com'
+      phone: '(619) 616-8099',
+      email: 'Anthony@gemhometeam.com',
       link: 'gemteam.youcanbook.me',
       photo: 'assets/img/team/anthony'
     },
     {
       id: 'megan',
-      name: 'Megan',                                // TODO: full name
-      nmls: '',                                     // TODO: Megan's NMLS ID
-      phone: '',
-      email: '',
+      name: 'Megan Sawamura',
+      nmls: '972639',
+      phone: '(858) 567-2233',
+      email: 'Megan@gemhometeam.com',
       link: 'gemteam.youcanbook.me',
       photo: 'assets/img/team/megan'
     }
