@@ -915,6 +915,57 @@ test('new-tab inputs survive a share-link round trip', async () => {
   await page.waitForTimeout(400);
 });
 
+test('presenter and client name flow onto the printed report and CSV', async () => {
+  const p2 = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await p2.goto(BASE, { waitUntil: 'networkidle' });
+  await p2.waitForTimeout(400);
+
+  // Open the presenter popover, name the client, switch people.
+  await p2.click('#btnPresenter');
+  await p2.waitForTimeout(150);
+  await p2.fill('#clientName', 'Jane & John Smith');
+  await p2.waitForTimeout(150);
+  assert.equal(await text('#printFor') || await p2.textContent('#printFor'),
+    'Prepared for Jane & John Smith', 'client name lands on the report header');
+
+  await p2.click('.presenter-opt[data-lo="megan"]');
+  await p2.waitForTimeout(150);
+  let by = await p2.textContent('#printPreparedBy');
+  assert.match(by, /Megan/, 'Megan becomes the preparer');
+  assert.ok(!/NMLS/.test(by), 'no NMLS printed while hers is unknown');
+  assert.ok(!(await p2.evaluate(() => document.getElementById('presenterWarn').hidden)),
+    'the popover warns that her details are incomplete');
+
+  await p2.click('.presenter-opt[data-lo="anthony"]');
+  await p2.waitForTimeout(150);
+  by = await p2.textContent('#printPreparedBy');
+  assert.match(by, /Anthony Edrozo · NMLS #2829800/, 'Anthony carries his NMLS');
+  assert.match(await p2.textContent('#printFoot'), /Anthony Edrozo · NMLS #2829800/);
+  assert.match(await p2.textContent('#printLoCta'), /gemteam\.youcanbook\.me/);
+  await p2.keyboard.press('Escape');
+
+  // The CSV export carries the same identity block.
+  const [dl] = await Promise.all([
+    p2.waitForEvent('download', { timeout: 10000 }),
+    p2.click('#btnExportSchedule')
+  ]);
+  const fs = await import('node:fs');
+  const csv = fs.readFileSync(await dl.path(), 'utf8');
+  assert.match(csv, /Prepared for,Jane & John Smith/, 'client name in the CSV');
+  assert.match(csv, /Prepared by,Anthony Edrozo · NMLS #2829800/, 'preparer in the CSV');
+
+  // Selections persist on this device, and never leak into the share URL.
+  await p2.reload({ waitUntil: 'networkidle' });
+  await p2.waitForTimeout(400);
+  assert.equal(await p2.inputValue('#clientName'), 'Jane & John Smith', 'client name persists');
+  assert.ok(!(await p2.evaluate(() => location.hash)).includes('Jane'),
+    'client name never appears in the share link');
+
+  // Leave a clean slate for other tests sharing this browser context.
+  await p2.evaluate(() => { localStorage.removeItem('gem-client'); localStorage.removeItem('gem-presenter'); });
+  await p2.close();
+});
+
 test('printing produces the branded Cyan Edge report chrome', async () => {
   const p2 = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await p2.goto(BASE, { waitUntil: 'networkidle' });

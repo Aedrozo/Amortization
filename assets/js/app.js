@@ -43,6 +43,46 @@
   };
 
   /*
+   * The people who present this calculator to clients. Whoever is selected
+   * under the header's "Presenting" control appears on printed reports and
+   * CSV exports with their photo, NMLS ID and contact lines. Photos live in
+   * assets/img/team/<id>.jpg|png|webp and are picked up automatically;
+   * initials are shown until a photo exists. Leave any contact field empty
+   * and its line simply isn't printed.
+   */
+  var TEAM = [
+    {
+      id: 'anthony',
+      name: 'Anthony Edrozo',
+      nmls: '2829800',
+      phone: '',                                    // e.g. '(555) 555-1234'
+      email: '',                                    // e.g. 'anthony@example.com'
+      link: 'gemteam.youcanbook.me',
+      photo: 'assets/img/team/anthony'
+    },
+    {
+      id: 'megan',
+      name: 'Megan',                                // TODO: full name
+      nmls: '',                                     // TODO: Megan's NMLS ID
+      phone: '',
+      email: '',
+      link: 'gemteam.youcanbook.me',
+      photo: 'assets/img/team/megan'
+    }
+  ];
+
+  function activeLO() {
+    for (var i = 0; i < TEAM.length; i++) if (TEAM[i].id === state.presenter) return TEAM[i];
+    return TEAM[0];
+  }
+
+  function loInitials(lo) {
+    return lo.name.trim().split(/\s+/).slice(0, 2).map(function (w) {
+      return w.charAt(0).toUpperCase();
+    }).join('');
+  }
+
+  /*
    * Fields that must be filled in before this page is used publicly. Anything
    * still blank is named explicitly in the on-page warning, so nobody has to
    * guess what is outstanding.
@@ -165,6 +205,8 @@
     oneTime: [],
     debts: [],
     bdType: '21',
+    presenter: 'anthony',
+    clientName: '',
     sideTouched: false,
     activeTab: 'payment'
   };
@@ -1514,9 +1556,19 @@
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 
+  /** Report identity rows shared by every CSV export. */
+  function csvPreamble(title) {
+    var lo = activeLO();
+    var lines = [[title]];
+    if (state.clientName) lines.push(['Prepared for', state.clientName]);
+    lines.push(['Prepared by', loByline(lo) + ' · Gem Home Team × NEO Home Loans']);
+    lines.push(['Date', new Date().toLocaleDateString('en-US',
+      { year: 'numeric', month: 'long', day: 'numeric' })]);
+    return lines;
+  }
+
   function scheduleCSV(s, title) {
-    var lines = [];
-    lines.push([title]);
+    var lines = csvPreamble(title);
     lines.push(['Loan amount', s.principal.toFixed(2)]);
     lines.push(['Rate', s.annualRate + '%']);
     lines.push(['Scheduled payment', s.basePayment.toFixed(2)]);
@@ -1534,8 +1586,7 @@
   }
 
   function sideBySideCSV(base, accel, chosen) {
-    var lines = [];
-    lines.push(['Side-by-side amortization comparison']);
+    var lines = csvPreamble('Side-by-side amortization comparison');
     lines.push(['Minimum payment', base.basePayment.toFixed(2)]);
     lines.push(['Your payment', chosen.toFixed(2)]);
     lines.push(['Interest saved', (base.totalInterest - accel.totalInterest).toFixed(2)]);
@@ -2508,7 +2559,7 @@
     $$('input, select').forEach(function (elx) {
       if (elx.type === 'range') return;
       if (['homePrice', 'downPayment', 'downPaymentPct', 'loanAmount', 'extraMonthly',
-        'yearsInHome', 'sidePayment', 'loanTerm'].indexOf(elx.id) >= 0) return;
+        'yearsInHome', 'sidePayment', 'loanTerm', 'clientName'].indexOf(elx.id) >= 0) return;
       if (elx.dataset.sc || elx.dataset.ot) return;
       elx.addEventListener('input', recalcSoon);
       elx.addEventListener('change', recalcSoon);
@@ -2871,24 +2922,168 @@
    * Dark mode flips to the light palette for the duration of the print —
    * charts bake their colours into the SVG, so they re-render too.
    * ================================================================== */
+  /** "Anthony Edrozo · NMLS #2829800" — NMLS omitted while it's unknown. */
+  function loByline(lo) {
+    return lo.name + (lo.nmls ? ' · NMLS #' + lo.nmls : '');
+  }
+
+  /* Photos are probed rather than referenced directly: a missing headshot
+   * must fall back to initials, not a broken-image icon or a console full of
+   * 404s — a HEAD fetch is silent either way. One probe per person, cached. */
+  var photoProbes = {};
+  var photoUrls = {};
+  function probePhoto(lo, done) {
+    if (!photoProbes[lo.id]) {
+      photoProbes[lo.id] = ['jpg', 'png', 'webp'].reduce(function (chain, ext) {
+        return chain.then(function (found) {
+          if (found) return found;
+          var url = lo.photo + '.' + ext;
+          return fetch(url, { method: 'HEAD' }).then(function (r) {
+            return r.ok ? url : null;
+          }, function () { return null; });
+        });
+      }, Promise.resolve(null)).then(function (url) {
+        photoUrls[lo.id] = url;
+        return url;
+      });
+    }
+    photoProbes[lo.id].then(done);
+  }
+
+  function paintAvatar(el, lo) {
+    if (!el) return;
+    el.dataset.lo = lo.id;
+    el.textContent = loInitials(lo);
+    el.style.backgroundImage = '';
+    probePhoto(lo, function (url) {
+      if (url && el.dataset.lo === lo.id) {
+        el.style.backgroundImage = 'url("' + url + '")';
+        el.textContent = '';
+      }
+    });
+  }
+
   function refreshPrintChrome() {
+    var lo = activeLO();
     var tab = document.querySelector('.tab[aria-selected="true"]');
     var tool = tab ? tab.textContent.trim() : '';
     var title = $('printTitle');
     if (title) title.textContent = tool ? 'Mortgage Analysis — ' + tool : 'Mortgage Analysis';
 
+    var pf = $('printFor');
+    if (pf) {
+      pf.hidden = !state.clientName;
+      pf.textContent = state.clientName ? 'Prepared for ' + state.clientName : '';
+    }
+
     var by = $('printPreparedBy');
-    if (by) by.textContent = 'Prepared by ' + CONFIG.loanOfficer + ' · NMLS #' + CONFIG.loanOfficerNmls +
-      ' · Gem Home Team × NEO Home Loans';
+    if (by) by.textContent = 'Prepared by ' + loByline(lo) + ' · Gem Home Team × NEO Home Loans';
 
     var date = $('printDate');
     if (date) date.textContent = new Date().toLocaleDateString('en-US',
       { year: 'numeric', month: 'long', day: 'numeric' });
 
     var foot = $('printFoot');
-    if (foot) foot.textContent = CONFIG.loanOfficer + ' · NMLS #' + CONFIG.loanOfficerNmls +
+    if (foot) foot.textContent = loByline(lo) +
       ' · ' + String(CONFIG.statesLicensed || '').replace(/\.$/, '') + ' · ' + CONFIG.company +
       ', NMLS #' + CONFIG.companyNmls + ' · Equal Housing Lender';
+
+    // Presenter card on the printed page
+    var nameEl = $('printLoName');
+    if (nameEl) nameEl.textContent = loByline(lo);
+    var contact = $('printLoContact');
+    if (contact) {
+      contact.textContent = [lo.phone, lo.email].filter(Boolean).join(' · ') ||
+        'Gem Home Team × NEO Home Loans';
+    }
+    var cta = $('printLoCta');
+    if (cta) cta.textContent = lo.link ? lo.link.replace(/^https?:\/\//, '') : '';
+    paintAvatar($('printLoAvatar'), lo);
+  }
+
+  /* ==================================================================
+   * Presenter control — who is showing this to a client, and the client's
+   * name for the report. Both stay in localStorage on this device only.
+   * ================================================================== */
+  function renderPresenterUI() {
+    var lo = activeLO();
+    var btnName = $('presenterBtnName');
+    if (btnName) btnName.textContent = lo.name.split(/\s+/)[0];
+    paintAvatar($('presenterAvatar'), lo);
+
+    var list = $('presenterList');
+    if (list) {
+      list.innerHTML = TEAM.map(function (t) {
+        return '<button type="button" class="presenter-opt" role="radio" data-lo="' + t.id + '"' +
+          ' aria-checked="' + (t.id === state.presenter ? 'true' : 'false') + '">' +
+          '<span class="avatar" data-avatar="' + t.id + '">' + esc(loInitials(t)) + '</span>' +
+          '<span><span class="who">' + esc(t.name) + '</span>' +
+          '<span class="who-sub">' + (t.nmls ? 'NMLS #' + esc(t.nmls) : 'NMLS ID needed') + '</span></span>' +
+          '</button>';
+      }).join('');
+      TEAM.forEach(function (t) {
+        var av = list.querySelector('[data-avatar="' + t.id + '"]');
+        if (av) paintAvatar(av, t);
+      });
+    }
+
+    var warn = $('presenterWarn');
+    if (warn) {
+      var missing = [];
+      if (!lo.nmls) missing.push('NMLS ID');
+      if (!lo.phone && !lo.email) missing.push('contact info');
+      warn.hidden = !missing.length;
+      warn.textContent = missing.length
+        ? 'Before client use, add ' + lo.name.split(/\s+/)[0] + '\u2019s ' + missing.join(', ') +
+          ' in CONFIG (assets/js/app.js, TEAM).'
+        : '';
+    }
+  }
+
+  function initPresenter() {
+    try {
+      var storedLo = localStorage.getItem('gem-presenter');
+      if (storedLo && TEAM.some(function (t) { return t.id === storedLo; })) state.presenter = storedLo;
+      state.clientName = localStorage.getItem('gem-client') || '';
+    } catch (e) { /* private mode */ }
+    var input = $('clientName');
+    if (input) input.value = state.clientName;
+
+    var btn = $('btnPresenter');
+    var pop = $('presenterPop');
+    function closePop() { pop.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      pop.hidden = !pop.hidden;
+      btn.setAttribute('aria-expanded', pop.hidden ? 'false' : 'true');
+      if (!pop.hidden) renderPresenterUI();
+    });
+    document.addEventListener('click', function (e) {
+      if (!pop.hidden && !pop.contains(e.target) && e.target !== btn && !btn.contains(e.target)) closePop();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !pop.hidden) closePop();
+    });
+
+    pop.addEventListener('click', function (e) {
+      // Selecting re-renders the list, which detaches the clicked node and
+      // would make the outside-click closer misread it — keep it local.
+      e.stopPropagation();
+      var opt = e.target.closest('.presenter-opt');
+      if (!opt) return;
+      state.presenter = opt.dataset.lo;
+      try { localStorage.setItem('gem-presenter', state.presenter); } catch (err) { /* ignore */ }
+      renderPresenterUI();
+      refreshPrintChrome();
+    });
+
+    if (input) input.addEventListener('input', function () {
+      state.clientName = this.value.trim();
+      try { localStorage.setItem('gem-client', state.clientName); } catch (err) { /* ignore */ }
+      refreshPrintChrome();
+    });
+
+    renderPresenterUI();
   }
 
   function initPrint() {
@@ -2924,6 +3119,7 @@
     initInputs();
     initExports();
     initBranding();
+    initPresenter();
     initPrint();
     initStickyPanels();
     initTooltips();

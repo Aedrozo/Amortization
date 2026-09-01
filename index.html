@@ -59,6 +59,25 @@
       </svg>
     </div>
     <div class="header-actions no-print">
+      <div class="presenter-wrap">
+        <button class="icon-btn" id="btnPresenter" type="button" title="Who's presenting, and the client's name for reports"
+                aria-haspopup="true" aria-expanded="false">
+          <span class="avatar" id="presenterAvatar" aria-hidden="true"></span>
+          <span class="btn-text" id="presenterBtnName">Presenting</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="popover" id="presenterPop" hidden>
+          <div class="pop-title">Presenting as</div>
+          <div id="presenterList" role="radiogroup" aria-label="Team member presenting"></div>
+          <div class="field mt-12 mb-0">
+            <label class="field-label" for="clientName">Client name on reports</label>
+            <input type="text" id="clientName" placeholder="e.g. Jane &amp; John Smith" autocomplete="off">
+            <div class="hint">Appears as &ldquo;Prepared for &hellip;&rdquo; on printed reports and CSV exports.
+              Stays on this device only &mdash; never in share links.</div>
+            <div class="hint pop-warn" id="presenterWarn" hidden></div>
+          </div>
+        </div>
+      </div>
       <button class="icon-btn" id="btnShare" type="button" title="Copy a link to this exact scenario">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
         <span class="btn-text">Share</span>
@@ -129,9 +148,20 @@
   <svg viewBox="0 0 760 150" role="img" aria-label="Gem Home Team and NEO Home Loans"><use href="#mark-lockup"></use></svg>
   <div class="print-head-meta">
     <div class="print-title" id="printTitle">Mortgage Analysis</div>
+    <div class="print-for" id="printFor" hidden></div>
     <div class="print-sub" id="printPreparedBy"></div>
     <div class="print-date" id="printDate"></div>
   </div>
+</div>
+
+<!-- Print-only presenter card: photo (or initials), NMLS and contact lines. -->
+<div class="print-lo" aria-hidden="true">
+  <span class="avatar avatar-lg" id="printLoAvatar"></span>
+  <div>
+    <div class="print-lo-name" id="printLoName"></div>
+    <div class="print-lo-contact" id="printLoContact"></div>
+  </div>
+  <div class="print-lo-cta" id="printLoCta"></div>
 </div>
 
 <!-- =============================================================
