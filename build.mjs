@@ -21,6 +21,19 @@ let html = read('index.html');
 
 const css = read('assets/css/styles.css');
 const scripts = ['assets/js/finance.js', 'assets/js/charts.js', 'assets/js/app.js'];
+
+// Team headshots ride along as data URIs: the probe-by-fetch that works on
+// the multi-file site cannot reach separate files from a single-file page.
+const teamPhotos = {};
+for (const id of ['anthony', 'megan']) {
+  for (const ext of ['jpg', 'png', 'webp']) {
+    try {
+      const buf = readFileSync(resolve(root, `assets/img/team/${id}.${ext}`));
+      teamPhotos[id] = `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,` + buf.toString('base64');
+      break;
+    } catch { /* try next extension */ }
+  }
+}
 const favicon = read('assets/img/favicon.svg');
 
 /**
@@ -57,7 +70,11 @@ html = inline(html,
 for (const src of scripts) {
   const tag = new RegExp('<script src="' + src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"></script>');
   if (!tag.test(html)) throw new Error('Could not find script tag for ' + src);
-  html = inline(html, tag, '<script>\n' + guard(read(src)) + '\n</script>');
+  let block = '<script>\n' + guard(read(src)) + '\n</script>';
+  if (src === 'assets/js/app.js' && Object.keys(teamPhotos).length) {
+    block = '<script>window.__TEAM_PHOTOS = ' + JSON.stringify(teamPhotos) + ';</script>\n' + block;
+  }
+  html = inline(html, tag, block);
 }
 
 // --- verify nothing external survived -------------------------------------

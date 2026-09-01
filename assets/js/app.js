@@ -2933,6 +2933,13 @@
   var photoProbes = {};
   var photoUrls = {};
   function probePhoto(lo, done) {
+    // Single-file builds inline the headshots as data URIs, since a fetch
+    // probe cannot reach separate files from inside one self-contained page.
+    if (window.__TEAM_PHOTOS && window.__TEAM_PHOTOS[lo.id]) {
+      photoUrls[lo.id] = window.__TEAM_PHOTOS[lo.id];
+      done(photoUrls[lo.id]);
+      return;
+    }
     if (!photoProbes[lo.id]) {
       photoProbes[lo.id] = ['jpg', 'png', 'webp'].reduce(function (chain, ext) {
         return chain.then(function (found) {
