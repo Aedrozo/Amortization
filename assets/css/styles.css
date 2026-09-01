@@ -1178,13 +1178,14 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
 
   /* Screen chrome that has no business on paper. */
   .site-header, .tabs, .hero, .header-actions, .cta-band,
-  .btn, .icon-btn, .no-print, .chart-tip { display: none !important; }
+  .btn, .icon-btn, .no-print, .chart-tip,
+  .info, .segmented, .range-row, .card-body > .hint { display: none !important; }
   .tab-panel[hidden] { display: none !important; }
 
   /* -- report header ------------------------------------------------ */
   .print-head {
     display: flex !important; align-items: flex-end; justify-content: space-between;
-    gap: 20px; padding: 0 0 14px; margin-bottom: 18px;
+    gap: 20px; padding: 0 0 10px; margin-bottom: 12px;
   }
   .print-head svg { height: 54px; width: auto; color: var(--brand-ink); }
   .print-head-meta { text-align: right; }
@@ -1195,7 +1196,7 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
   /* -- presenter card ------------------------------------------------ */
   .print-lo {
     display: flex !important; align-items: center; gap: 12px;
-    padding: 10px 14px; margin: -4px 0 18px;
+    padding: 8px 12px; margin: -2px 0 12px;
     background: #eef9fe !important; border-radius: 10px;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
@@ -1217,18 +1218,34 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
   }
 
   /* -- cards, stats, verdicts --------------------------------------- */
-  .card { break-inside: avoid; box-shadow: none; border-color: #d0d7de; }
+  /* Cards may break across pages — a blanket break-inside:avoid pushed any
+     tall card wholesale to the next sheet, leaving half-empty pages. The
+     units that must never split are guarded individually instead. */
+  .card { break-inside: auto; box-shadow: none; border-color: #d0d7de; }
+  .card-head { break-after: avoid; }
+  .stat, .verdict, .chart-box, .payment-split, .milestone, .callout,
+  .print-lo, .outlay-grid > *, .onetime-item, .eho-bar { break-inside: avoid; }
+  .legend { break-before: avoid; }
   .verdict, .callout, .verdict-badge, .stat-pill, .delta-pill {
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
-  .verdict { break-inside: avoid; }
-  .layout { grid-template-columns: 1fr; gap: 14px; }
+  .layout { grid-template-columns: 1fr; gap: 10px; }
+  .tab-panel { padding: 0 0 20px; }
+  .card + .card, .card.mt-20, .stat-grid + .card { margin-top: 10px; }
+  .card-head { padding: 10px 14px 7px; }
+  .card-body { padding: 12px 14px; }
+  .verdict { padding: 12px 14px; }
 
+  .stat-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .stat {
     background: #eef9fe !important; border-color: #c9ecfb !important;
-    border-radius: 10px !important;
+    border-radius: 10px !important; padding: 9px 11px;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
+  .stat-label { min-height: 0; font-size: 8.5px; margin-bottom: 3px; }
+  .stat-value { font-size: 15px; }
+  .stat.is-hero .stat-value { font-size: 17px; }
+  .stat-sub { font-size: 8.5px; line-height: 1.35; }
   .stat.is-hero { background: linear-gradient(135deg, #2bb3e8, #0f75a3) !important; border: 0 !important; }
   .stat.is-hero .stat-value, .stat.is-hero .stat-label, .stat.is-hero .stat-sub { color: #fff !important; }
   .stat-value { color: #0b2a3c; }
@@ -1242,24 +1259,73 @@ table.paired th.cell-accel { background: color-mix(in srgb, var(--cyan-500) 8%, 
   }
 
   /* -- tables & charts ----------------------------------------------- */
-  .table-scroll.capped { max-height: none; overflow: visible; }
-  table.data { font-size: 9.5px; }
-  table.data th, table.data td { padding: 4px 6px; }
+  .table-scroll { max-height: none !important; overflow: visible !important; }
+  table.data { font-size: 8.5px; width: 100%; }
+  table.data th, table.data td { padding: 3px 5px; }
+  /* Headers may wrap in print so a wide table shrinks to the sheet instead
+     of running off its right edge. */
   table.data thead th {
-    position: static;
+    position: static; white-space: normal;
     background: #eef9fe !important; color: #0b2a3c !important;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   .compare-grid { grid-template-columns: 1fr 1fr; }
-  .chart-box svg { max-height: 250px; }
+  .chart-box svg { max-height: 230px; }
 
-  /* -- legal footer, compact but complete ---------------------------- */
-  .site-footer { margin-top: 26px; }
-  .disclaimer { font-size: 6.8px !important; line-height: 1.45 !important;
-    column-count: 2; column-gap: 18px; }
+  /* Inputs that live in the results area (buydown card, loan scenarios)
+     print as plain bold values, not form boxes. */
+  .field input, .field select, .input-wrap input {
+    border: 0 !important; background: transparent !important;
+    padding: 0 !important; height: auto !important; box-shadow: none !important;
+    font-weight: 700; font-size: 11px;
+  }
+  .input-wrap .affix { position: static; padding: 0 1px; font-size: 10px; }
+  .input-wrap { display: inline-flex; align-items: baseline; }
+  .field, .field-row, .field-row-3 { break-inside: avoid; }
+  .field { margin-bottom: 5px; }
+  .field-label { margin-bottom: 1px; font-size: 8.5px; }
+  .field-row, .field-row-3 { gap: 8px; }
+
+  /* A card whose only content is an empty-state prompt points at controls
+     that are not on the paper — drop it from the printout. */
+  .card:has(.empty-state) { display: none !important; }
+
+  /* -- disclosures page ---------------------------------------------- */
+  /* The legal block always opens its own final sheet, styled as a designed
+     "Disclosures" page. Left to fragmentation luck it kept orphaning the
+     Equal Housing bar onto a page of its own — and Chromium drops multicol
+     text that fragments across printed pages, so the columns are only safe
+     because this block starts at a page top and fits on one sheet. */
+  .site-footer { break-before: page; margin-top: 0; }
+  .site-footer::before {
+    content: "Disclosures & licensing";
+    display: block; font-size: 15px; font-weight: 800; letter-spacing: -.02em;
+    color: #0b2a3c; padding-bottom: 4px; margin-bottom: 10px;
+    border-bottom: 0;
+  }
+  .site-footer .footer-grid::before {
+    content: ""; display: block; width: 46px; height: 3px; margin: -6px 0 12px;
+    background: #2bb3e8; border-radius: 2px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .footer-grid { display: block; }
+  /* The lockup already heads page one; repeating it here stranded a logo
+     alone on the last sheet. */
+  .footer-brand { display: none !important; }
+  .licensing {
+    background: #eef9fe !important; border-radius: 8px;
+    padding: 8px 11px !important; margin-bottom: 10px !important;
+    font-size: 8px !important; line-height: 1.55 !important; color: #0b2a3c !important;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .disclaimer {
+    font-size: 7px !important; line-height: 1.5 !important;
+    max-width: none !important; column-count: 2; column-gap: 22px;
+  }
   .disclaimer p { break-inside: avoid; }
-  .footer-brand svg { height: 34px !important; }
-  .eho { break-inside: avoid; }
+  .eho-bar { margin-top: 12px; border-top: 1px solid #d0d7de; padding-top: 8px; }
+  .eho-logo { width: 30px !important; height: auto; }
+  .eho-text { font-size: 7px !important; }
 
   .print-only { display: block !important; }
   a[href]::after { content: ""; }

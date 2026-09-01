@@ -1101,6 +1101,17 @@ test('a narrow or short window hands scrolling back to the page', async () => {
   }
 });
 
+test('every tool prints tight, branded pages with no near-blank sheets', async () => {
+  // Runs the same grading as tools/print-audit.mjs: page counts and per-page
+  // ink coverage across all eight tools, so a print regression (an orphaned
+  // logo page, a clipped table pushing content off) fails here.
+  const { execFileSync } = await import('node:child_process');
+  const out = execFileSync('node', ['tools/print-audit.mjs'], {
+    encoding: 'utf8', env: { ...process.env, BASE_URL: BASE }, timeout: 600000
+  });
+  assert.match(out, /CLEAN/, `print audit findings:\n${out}`);
+});
+
 test('every text colour meets WCAG AA contrast', async () => {
   // Runs the same check as tools/audit.mjs, on one representative width, so a
   // palette change that makes text unreadable fails here rather than shipping.
