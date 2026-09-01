@@ -469,7 +469,7 @@ test('the calls to action point at the real destinations', async () => {
   assert.equal(await page.getAttribute('#ctaPrimary', 'href'),
     'https://neohomeloans.com/start/r/130389', 'rate quote link');
   assert.equal(await page.getAttribute('#ctaSecondary', 'href'),
-    'https://gemteam.youcanbook.me', 'loan officer booking link');
+    'mailto:Anthony@gemhometeam.com', 'loan officer contact goes straight to the team');
 });
 
 test('the Equal Housing Lender mark is rendered', async () => {
@@ -942,7 +942,9 @@ test('presenter and client name flow onto the printed report and CSV', async () 
   by = await p2.textContent('#printPreparedBy');
   assert.match(by, /Anthony Edrozo · NMLS #2829800/, 'Anthony carries his NMLS');
   assert.match(await p2.textContent('#printFoot'), /Anthony Edrozo · NMLS #2829800/);
-  assert.match(await p2.textContent('#printLoCta'), /gemteam\.youcanbook\.me/);
+  assert.ok(await p2.evaluate(() => document.getElementById('printLoCta').hidden),
+    'no booking-site line on the printed card');
+  assert.ok(!(await p2.content()).includes('youcanbook'), 'youcanbook.me is gone entirely');
   await p2.keyboard.press('Escape');
 
   // The CSV export carries the same identity block.

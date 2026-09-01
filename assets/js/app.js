@@ -24,7 +24,7 @@
    */
   var CONFIG = {
     quoteUrl: 'https://neohomeloans.com/start/r/130389',   // "Get my rate quote"
-    contactUrl: 'https://gemteam.youcanbook.me',           // "Talk to a loan officer"
+    contactUrl: 'mailto:Anthony@gemhometeam.com',          // "Talk to a loan officer"
 
     loanOfficer: 'Anthony Edrozo',
     loanOfficerNmls: '2829800',    // the individual originator's NMLS ID
@@ -57,7 +57,7 @@
       nmls: '2829800',
       phone: '(619) 616-8099',
       email: 'Anthony@gemhometeam.com',
-      link: 'gemteam.youcanbook.me',
+      link: '',
       photo: 'assets/img/team/anthony'
     },
     {
@@ -66,7 +66,7 @@
       nmls: '972639',
       phone: '(858) 567-2233',
       email: 'Megan@gemhometeam.com',
-      link: 'gemteam.youcanbook.me',
+      link: '',
       photo: 'assets/img/team/megan'
     }
   ];
@@ -2997,7 +2997,10 @@
         'Gem Home Team × NEO Home Loans';
     }
     var cta = $('printLoCta');
-    if (cta) cta.textContent = lo.link ? lo.link.replace(/^https?:\/\//, '') : '';
+    if (cta) {
+      cta.textContent = lo.link ? lo.link.replace(/^https?:\/\//, '') : '';
+      cta.hidden = !lo.link;
+    }
     paintAvatar($('printLoAvatar'), lo);
   }
 
